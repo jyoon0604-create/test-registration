@@ -1,0 +1,21 @@
+{
+  "name": "test-registration",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ICH 가이드라인 교육 참석자 등록 페이지 (테스트)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.9.0",
+    "next": "^16.4.6",
+    "nodemailer": "^10.6.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "overrides": {
+    "zod": "^4.6.6"
+  }
+}
