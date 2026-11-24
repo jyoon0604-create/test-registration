@@ -221,3 +221,41 @@ legend { font-weight: 600; font-size: 14px; margin-bottom: 8px; padding: 0; }
   .btn.primary { flex: 1; }
   .preview-badge { padding: 8px 16px; }
 }
+
+/* 연사 페이지: 밝은 화이트톤 고정 + 키비주얼 영역 */
+.speaker-page {
+  --bg: #ffffff; --surface: #ffffff; --text: #1f2933; --muted: #5f6b7a; --border: #e3e8ef;
+  --primary: #1d4e89; --primary-hover: #163d6c; --primary-ink: #ffffff; --soft: #f5f8fb;
+  --error: #c62828; --ok: #2e7d32; --warn-bg: #fff6e8; --warn-ink: #8a4b00;
+  background: #ffffff; color: var(--text); min-height: 100vh; color-scheme: light;
+}
+.sp-topbar { border-bottom: 1px solid var(--border); background: #fff; }
+.sp-topbar-in { display: flex; justify-content: space-between; align-items: center; height: 56px; font-size: 15px; }
+.sp-topbar-in span { color: var(--muted); font-size: 14px; }
+.kv {
+  margin: 24px 0 0; aspect-ratio: 3 / 1; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(135deg, #f3f7fc 0%, #e8f0fa 100%); border: 1.5px dashed #c5d3e4;
+  display: flex; align-items: center; justify-content: center;
+}
+.kv.has { border: 0; background: none; }
+.kv img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kv figcaption { text-align: center; color: #6b7f99; display: flex; flex-direction: column; gap: 6px; padding: 16px; }
+.kv figcaption b { font-size: 18px; color: #4a6283; }
+.kv figcaption span { font-size: 13px; }
+.sp-intro { padding: 36px 0 28px; }
+.sp-intro .eyebrow { color: var(--primary); font-weight: 700; opacity: 1; }
+.sp-intro h1 { margin: 0; font-size: clamp(26px, 4.5vw, 36px); line-height: 1.3; }
+.sp-intro .subtitle { color: var(--muted); opacity: 1; margin: 8px 0 20px; }
+.sp-facts { display: flex; flex-wrap: wrap; gap: 0; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--soft); }
+.sp-facts div { flex: 1 1 200px; padding: 14px 18px; border-right: 1px solid var(--border); }
+.sp-facts div:last-child { border-right: 0; }
+.sp-facts dt { font-size: 13px; color: var(--muted); }
+.sp-facts dd { margin: 0; font-weight: 700; }
+.speaker-page .wizard-wrap { max-width: 980px; margin-top: 0; }
+.speaker-page .wizard { box-shadow: 0 4px 24px rgba(29, 78, 137, .06); }
+.speaker-page .footer { padding-top: 40px; }
+@media (max-width: 640px) {
+  .kv { aspect-ratio: 16 / 9; margin-top: 16px; border-radius: 12px; }
+  .sp-facts div { border-right: 0; border-bottom: 1px solid var(--border); }
+  .sp-facts div:last-child { border-bottom: 0; }
+}
