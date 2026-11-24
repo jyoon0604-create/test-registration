@@ -97,10 +97,14 @@ export default function RegistrationForm() {
         <div className="check" aria-hidden>✓</div>
         <h3>등록이 완료되었습니다</h3>
         <p>등록번호 <b>{result.registrationId}</b></p>
-        {result.mailSent ? (
+        {result.mailSent === true && (
           <p className="muted"><b>{result.email}</b>(으)로 확인 메일을 보냈어요. 메일이 보이지 않으면 스팸함도 확인해 주세요.</p>
-        ) : (
+        )}
+        {result.mailSent === false && (
           <p className="warn">등록은 저장됐지만 확인 메일 발송에 실패했어요. 담당자에게 문의해 주세요.</p>
+        )}
+        {result.mailSent == null && (
+          <p className="muted">등록번호를 메모해 두시면 문의할 때 편리해요.</p>
         )}
       </div>
     );

@@ -1,4 +1,5 @@
 import { EVENT } from "@/lib/event";
+import { mailEnabled } from "@/lib/mail";
 import RegistrationForm from "./RegistrationForm";
 
 export default function Home() {
@@ -32,7 +33,9 @@ export default function Home() {
 
         <section className="card" id="register">
           <h2>등록하기</h2>
-          <p className="muted">모든 항목은 필수예요. 제출하면 입력하신 이메일로 확인 메일이 발송됩니다.</p>
+          <p className="muted">
+            모든 항목은 필수예요.{mailEnabled() ? " 제출하면 입력하신 이메일로 확인 메일이 발송됩니다." : ""}
+          </p>
           <RegistrationForm />
         </section>
       </div>
