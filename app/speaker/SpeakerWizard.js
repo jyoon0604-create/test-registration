@@ -22,6 +22,11 @@ const DEMO_RETURN = {
   bio: "현) ○○제약 품질보증팀 팀장\n전) ○○바이오 QA 매니저\nICH Q9(R1) 실무 적용 자문", consentPrivacy: true,
 };
 
+function parseAt(s) {
+  const m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
+}
+
 function fmt(d) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
@@ -71,6 +76,11 @@ export default function SpeakerWizard() {
   const [justSaved, setJustSaved] = useState(null); // 방금 저장한 섹션
   const [returning, setReturning] = useState(false);
   const [invited, setInvited] = useState(false); // 개인 링크로 들어왔는지
+  const [token, setToken] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [serverMessage, setServerMessage] = useState("");
   const [resendOpen, setResendOpen] = useState(false);
   const [resendSent, setResendSent] = useState(false);
   const topRef = useRef(null);
@@ -83,12 +93,17 @@ export default function SpeakerWizard() {
   useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
 
   useEffect(() => {
-    const demo = new URLSearchParams(window.location.search).get("demo");
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get("demo");
+    const t = params.get("t");
+    if (t) { loadSpeaker(t); return; }
     if (demo === "link") {
+      setDemoMode(true);
       setV((s) => ({ ...s, name: DEMO_RETURN.name, email: DEMO_RETURN.email }));
       setInvited(true);
     }
     if (demo === "return") {
+      setDemoMode(true);
       setInvited(true);
       setV((s) => ({ ...s, ...DEMO_RETURN, guideRead: true }));
       setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: null });
@@ -97,6 +112,42 @@ export default function SpeakerWizard() {
       setStep(2);
     }
   }, []);
+
+  // 개인 링크(?t=…)로 들어오면 시트에 저장된 내용을 불러옵니다.
+  async function loadSpeaker(t) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/speaker?t=${encodeURIComponent(t)}`, { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!data.ok) { setLinkError(data.message || "링크를 확인하지 못했어요."); return; }
+      const sp = data.speaker;
+      setToken(t);
+      setInvited(true);
+      setV((s) => ({
+        ...s,
+        name: sp.name, email: sp.email, nameEn: sp.nameEn, phone: sp.phone, organization: sp.organization,
+        position: sp.position, bio: sp.bio, consentPrivacy: !!sp.consent,
+        photo: sp.photoUrl ? { name: "등록된 사진", url: sp.photoUrl } : null,
+        session: sp.session, title: sp.title, summary: sp.summary,
+        material: sp.materialUrl ? { name: "등록된 발표자료", url: sp.materialUrl } : null,
+        rehearsal: sp.rehearsal ? sp.rehearsal.split(", ").filter(Boolean) : [],
+        recording: sp.recording === "동의하지 않음" ? "no" : "yes", request: sp.request,
+      }));
+      if (sp.photoUrl) setPreview(sp.photoUrl);
+      const sub = { profile: parseAt(sp.profileAt), talk: parseAt(sp.talkAt) };
+      setSubmitted(sub);
+      if (sub.profile || sub.talk) {
+        setReturning(true);
+        setStarted(true);
+        setV((s) => ({ ...s, guideRead: true }));
+        setStep(!sub.profile ? 1 : !sub.talk ? 2 : 3);
+      }
+    } catch {
+      setLinkError("네트워크 연결을 확인하고 새로고침해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function set(name, value) {
     setV((s) => ({ ...s, [name]: value }));
@@ -129,18 +180,53 @@ export default function SpeakerWizard() {
     go(1);
   }
 
-  function saveSection() {
+  function markSaved(sec, at) {
+    setSubmitted((s) => ({ ...s, [sec]: at }));
+    setDirty((d) => ({ ...d, [sec]: false }));
+    setJustSaved(sec);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function saveSection() {
+    setServerMessage("");
     if (!check()) return;
     const sec = SECTION_OF_STEP[step];
-    // 디자인 미리보기: 실제 저장 없이 저장된 것처럼 보여줍니다.
     setSending(true);
-    setTimeout(() => {
+    if (!token) {
+      // 디자인 미리보기: 실제 저장 없이 저장된 것처럼 보여줍니다.
+      setTimeout(() => { setSending(false); markSaved(sec, new Date()); }, 500);
+      return;
+    }
+    const fd = new FormData();
+    fd.set("t", token);
+    fd.set("section", sec);
+    if (sec === "profile") {
+      for (const k of ["nameEn", "phone", "organization", "position", "bio"]) fd.set(k, v[k] || "");
+      fd.set("consentPrivacy", v.consentPrivacy ? "true" : "");
+      if (v.photo instanceof File) fd.set("photo", v.photo);
+      else fd.set("hasPhoto", v.photo ? "true" : "");
+    } else {
+      for (const k of ["session", "title", "summary", "recording", "request"]) fd.set(k, v[k] || "");
+      v.rehearsal.forEach((r) => fd.append("rehearsal", r));
+      if (v.material instanceof File) fd.set("material", v.material);
+    }
+    try {
+      const res = await fetch("/api/speaker", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({ ok: false, message: "서버 응답을 읽지 못했어요." }));
+      if (!data.ok) {
+        setErrors(data.errors || {});
+        setServerMessage(data.message || "저장하지 못했어요.");
+        return;
+      }
+      const sp = data.speaker;
+      if (sec === "profile" && sp.photoUrl) setV((s) => ({ ...s, photo: s.photo instanceof File ? s.photo : { name: "등록된 사진", url: sp.photoUrl } }));
+      if (sec === "talk" && sp.materialUrl) setV((s) => ({ ...s, material: { name: s.material?.name || "등록된 발표자료", url: sp.materialUrl } }));
+      markSaved(sec, parseAt(sec === "profile" ? sp.profileAt : sp.talkAt) || new Date());
+    } catch {
+      setServerMessage("네트워크 연결을 확인하고 다시 시도해 주세요.");
+    } finally {
       setSending(false);
-      setSubmitted((s) => ({ ...s, [sec]: new Date() }));
-      setDirty((d) => ({ ...d, [sec]: false }));
-      setJustSaved(sec);
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 500);
+    }
   }
 
   function stateOf(i) {
@@ -162,11 +248,27 @@ export default function SpeakerWizard() {
     setPreview(f ? URL.createObjectURL(f) : null);
   }
 
+  if (loading || linkError) {
+    return (
+      <section className="card wizard" ref={topRef}>
+        <div className="panel center">
+          {loading ? <p className="muted">연사 정보를 불러오는 중이에요…</p> : (
+            <>
+              <h2>링크를 확인하지 못했어요</h2>
+              <p className="muted">{linkError}</p>
+              <p><a className="btn ghost" href="/speaker">개인 링크 다시 받기</a></p>
+            </>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   const err = (k) => errors[k] && <p className="error" id={`e-${k}`}>{errors[k]}</p>;
 
   return (
     <section className="card wizard" ref={topRef}>
-      <p className="preview-badge">디자인 미리보기 · 아직 실제로 저장되지 않아요</p>
+      {demoMode && <p className="preview-badge">디자인 미리보기 · 아직 실제로 저장되지 않아요</p>}
 
       {!invited && (
         <div className="resume">
@@ -175,10 +277,15 @@ export default function SpeakerWizard() {
           ) : resendSent ? (
             <p role="status">연사 명단에 있는 주소라면 개인 링크를 다시 보냈어요. 메일함을 확인해 주세요.</p>
           ) : (
-            <form className="resume-form" onSubmit={(e) => { e.preventDefault(); setResendSent(true); }}>
+            <form className="resume-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const email = e.currentTarget.elements.resendEmail.value;
+              await fetch("/api/speaker/resend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }).catch(() => {});
+              setResendSent(true);
+            }}>
               <label htmlFor="s-resendEmail">등록 때 쓴 이메일</label>
               <div>
-                <input id="s-resendEmail" type="email" placeholder="name@company.com" required />
+                <input id="s-resendEmail" name="resendEmail" type="email" placeholder="name@company.com" required />
                 <button type="submit" className="btn ghost">링크 받기</button>
               </div>
             </form>
@@ -346,11 +453,12 @@ export default function SpeakerWizard() {
                 <input id="s-material" type="file" accept=".pdf,.ppt,.pptx"
                   onChange={(e) => set("material", e.target.files?.[0] || null)} />
                 {v.material ? (
-                  <span><b>{v.material.name}</b><br /><span className="hint">{(v.material.size / 1024 / 1024).toFixed(1)}MB · 눌러서 바꾸기</span></span>
+                  <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}눌러서 바꾸기</span></span>
                 ) : (
-                  <span><b>파일 선택</b> 또는 여기로 끌어다 놓기<br /><span className="hint">PDF·PPT·PPTX · 최종본은 {SPEAKER.materialDeadline}까지</span></span>
+                  <span><b>파일 선택</b> 또는 여기로 끌어다 놓기<br /><span className="hint">PDF·PPT·PPTX, 4MB 이하 · 더 큰 파일은 담당자 메일로 · 최종본은 {SPEAKER.materialDeadline}까지</span></span>
                 )}
               </label>
+              {err("material")}
             </div>
 
             <fieldset className="field">
@@ -432,6 +540,8 @@ export default function SpeakerWizard() {
           </>
         )}
       </div>
+
+      {serverMessage && <p className="banner server-msg" role="alert">{serverMessage}</p>}
 
       <div className="wizard-nav">
         {step > 0 ? <button type="button" className="btn ghost" onClick={() => go(step - 1)}>이전</button> : <span />}

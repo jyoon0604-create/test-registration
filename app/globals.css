@@ -293,3 +293,6 @@ input[readonly] { background: var(--soft); color: var(--muted); }
   .review-head h3 { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .badge { margin-left: 0; }
 }
+.panel.center { text-align: center; padding: 48px 24px; }
+.panel.center a.btn { display: inline-block; text-decoration: none; }
+.server-msg { margin: 16px 24px 0; }
