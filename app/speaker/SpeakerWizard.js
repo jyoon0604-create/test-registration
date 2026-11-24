@@ -12,7 +12,7 @@ const KEYS = {
     "consentPrivacy", "consentPortrait"],
   travel: ["flight", "from", "arrive", "depart", "flightNo", "passport", "hotel", "checkin", "checkout", "room", "diet", "travelNote"],
   fee: ["bank", "swift", "account", "holder", "bankAddr", "idCopy", "bankCopy", "feeConsent"],
-  talk: ["material", "pub", "pubFile", "request"],
+  talk: ["material", "materialLink", "pub", "pubFile", "request"],
 };
 // 일정 안내 줄 ↔ 탭
 const TIMELINE_TAB = { register: "profile", travel: "travel", fee: "fee", slides: "talk" };
@@ -81,7 +81,7 @@ function validate(tab, v, t, lang) {
     if (!v.feeConsent) e.feeConsent = E.feeConsent;
   }
   if (tab === "talk") {
-    if (!v.material) e.material = E.material;
+    if (!v.material && !v.materialLink.trim()) e.material = E.material;
     if (!v.pub) e.pub = E.pub;
   }
   return e;
@@ -121,7 +121,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
     bio: "", bioEn: "", title: "", titleEn: "", summary: "", level: "", networking: "", photo: null, consentPrivacy: false, consentPortrait: false,
     flight: "", from: "", arrive: "", depart: "", flightNo: "", passport: "", hotel: "", checkin: "", checkout: "", room: "", diet: "", travelNote: "",
     bank: "", swift: "", account: "", holder: "", bankAddr: "", idCopy: null, bankCopy: null, feeConsent: false,
-    material: null, pub: "", pubFile: null, request: "",
+    material: null, materialLink: "", pub: "", pubFile: null, request: "",
   });
 
   useEffect(() => () => preview && preview.startsWith("blob:") && URL.revokeObjectURL(preview), [preview]);
@@ -650,10 +650,15 @@ export default function SpeakerWizard({ lang = "ko" }) {
                 {v.material ? (
                   <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}{t.materialChange}</span></span>
                 ) : (
-                  <span>{t.materialPick}<br /><span className="hint">PDF · PPT · PPTX</span></span>
+                  <span>{t.materialPick}<br /><span className="hint">{S.fileHint}</span></span>
                 )}
               </label>
+              <p className="hint">{S.bigTip}</p>
               {err("material")}
+            </div>
+            <div className="field">
+              <label htmlFor="s-materialLink">{S.linkLabel}<span className="opt">{t.optional}</span></label>
+              <input id="s-materialLink" name="materialLink" type="text" placeholder={S.linkPh} value={v.materialLink} onChange={onInput} maxLength={300} />
             </div>
 
             <fieldset className="field">
