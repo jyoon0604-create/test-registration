@@ -381,3 +381,14 @@ input[readonly] { background: var(--soft); color: var(--muted); }
   .session-dl dd { margin-bottom: 10px; }
   .session-mini { grid-template-columns: 1fr; }
 }
+
+/* 연사별 마감일 */
+.sched-note { margin: -6px 0 12px; }
+.dday { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; vertical-align: 1px; }
+.dday.soon { background: #fff1db; color: #b45309; }
+.dday.later { background: var(--soft); color: var(--muted); }
+.dday.over { background: #fde8e8; color: var(--error); }
+.dday.done { background: #ecf8ef; color: var(--ok); }
+.timeline li.has-due.soon::before { border-color: #f59e0b; background: #f59e0b; }
+.timeline li.has-due.done::before { border-color: var(--ok); background: var(--ok); }
+.timeline li.has-due.soon .t-date { color: #b45309; }

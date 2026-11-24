@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TEXT, DEMO_SPEAKER } from "@/lib/speakerI18n";
+import { TEXT, DEMO_SPEAKER, DEMO_TODAY } from "@/lib/speakerI18n";
 
 const SECTION_OF_STEP = { 1: "profile", 2: "talk" };
 const PROFILE_KEYS = ["name", "nameEn", "email", "phone", "organization", "position", "bio", "photo", "consentPrivacy"];
@@ -55,6 +55,8 @@ export default function SpeakerWizard({ lang = "ko" }) {
   const [invited, setInvited] = useState(false); // 개인 링크로 들어왔는지
   const [finalOpen, setFinalOpen] = useState(false); // 담당자가 최종 안내를 공개했는지
   const [sessionInfo, setSessionInfo] = useState(null); // 담당자가 연사별로 넣는 세션 정보
+  const [deadlines, setDeadlines] = useState(null); // 연사별 마감일 { register, travel, slides } (YYYY-MM-DD)
+  const [today, setToday] = useState(() => new Date());
   const [token, setToken] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,6 +83,8 @@ export default function SpeakerWizard({ lang = "ko" }) {
     setDemoMode(true);
     setInvited(true);
     setSessionInfo(d.session);
+    setDeadlines(d.deadlines);
+    setToday(new Date(DEMO_TODAY + "T09:00:00"));
     if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
     if (demo === "return" || demo === "final") {
       setV((s) => ({ ...s, ...d, session: d.session.forum, photo: { name: "profile.jpg" }, consentPrivacy: true, guideRead: true }));
@@ -324,14 +328,25 @@ export default function SpeakerWizard({ lang = "ko" }) {
             <h2>{t.guideTitle}</h2>
             <p className="muted">{t.guideSub}</p>
 
-            <h3 className="sub">{t.scheduleTitle}</h3>
+            <h3 className="sub">{deadlines ? t.myScheduleTitle(v.name) : t.scheduleTitle}</h3>
+            {deadlines && <p className="hint sched-note">{t.myScheduleNote}</p>}
             <ol className="timeline">
-              {t.timeline.map((x) => (
-                <li key={x.title}>
-                  <span className="t-date">{x.date}</span>
-                  <div><b>{x.title}</b><p>{x.desc}</p></div>
-                </li>
-              ))}
+              {t.timeline.map((x) => {
+                const due = deadlines?.[x.key] ? new Date(deadlines[x.key] + "T00:00:00") : null;
+                const done = (x.key === "register" && submitted.profile && submitted.talk) || (x.key === "slides" && finalOpen);
+                const days = due ? Math.ceil((due - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000) : null;
+                const cls = done ? "done" : days == null ? "" : days < 0 ? "over" : days <= 7 ? "soon" : "later";
+                return (
+                  <li key={x.title} className={due ? `has-due ${cls}` : ""}>
+                    <span className="t-date">{due ? t.fmtDay(due) : x.date}</span>
+                    <div>
+                      <b>{x.title}</b>
+                      {due && <span className={`dday ${cls}`}>{done ? `✓ ${t.dl.done}` : days < 0 ? t.dl.over : t.dl.dday(days)}</span>}
+                      <p>{x.desc}</p>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
 
             {sessionInfo && <SessionCard t={t} info={sessionInfo} name={v.name} />}
