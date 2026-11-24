@@ -522,3 +522,17 @@ select { width: 100%; padding: 10px 12px; font: inherit; font-size: 15px; backgr
 .field .chip { display: inline-flex; margin: 0; font-weight: 400; }
 .field .chip.on { font-weight: 600; }
 .field .option-card { display: flex; margin: 0; }
+
+/* v10: 발표자료 메일 제출 안내 */
+.mail-box { border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px 14px; background: #f7fafd; margin: 0 0 6px; }
+.mail-box h3 { margin: 0 0 12px; font-size: 16px; color: var(--primary); }
+.mail-box dl { margin: 0; display: grid; gap: 10px; }
+.mail-box dl > div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; font-size: 14px; line-height: 1.55; }
+.mail-box dt { color: var(--muted); font-weight: 600; }
+.mail-box dd { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mail-box .mono { font-weight: 700; color: var(--text, #111); word-break: break-all; }
+.copy-btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer; color: var(--primary); }
+.mail-box .hint { margin: 12px 0 0; }
+.sent-check { align-items: flex-start; font-weight: 400; margin-bottom: 22px; }
+.sent-check b { font-weight: 600; }
+@media (max-width: 560px) { .mail-box dl > div { grid-template-columns: 1fr; gap: 2px; } }

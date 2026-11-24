@@ -12,7 +12,7 @@ const KEYS = {
     "consentPrivacy", "consentPortrait"],
   travel: ["flight", "from", "arrive", "depart", "flightNo", "passport", "hotel", "checkin", "checkout", "room", "diet", "travelNote"],
   fee: ["bank", "swift", "account", "holder", "bankAddr", "idCopy", "bankCopy", "feeConsent"],
-  talk: ["material", "materialLink", "pub", "pubFile", "request"],
+  talk: ["mailSent", "pub", "request"],
 };
 // 일정 안내 줄 ↔ 탭
 const TIMELINE_TAB = { register: "profile", travel: "travel", fee: "fee", slides: "talk" };
@@ -81,7 +81,6 @@ function validate(tab, v, t, lang) {
     if (!v.feeConsent) e.feeConsent = E.feeConsent;
   }
   if (tab === "talk") {
-    if (!v.material && !v.materialLink.trim()) e.material = E.material;
     if (!v.pub) e.pub = E.pub;
   }
   return e;
@@ -121,7 +120,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
     bio: "", bioEn: "", title: "", titleEn: "", summary: "", level: "", networking: "", photo: null, consentPrivacy: false, consentPortrait: false,
     flight: "", from: "", arrive: "", depart: "", flightNo: "", passport: "", hotel: "", checkin: "", checkout: "", room: "", diet: "", travelNote: "",
     bank: "", swift: "", account: "", holder: "", bankAddr: "", idCopy: null, bankCopy: null, feeConsent: false,
-    material: null, materialLink: "", pub: "", pubFile: null, request: "",
+    material: null, mailSent: false, pub: "", request: "",
   });
 
   useEffect(() => () => preview && preview.startsWith("blob:") && URL.revokeObjectURL(preview), [preview]);
@@ -154,7 +153,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
         flight: "office", from: lang === "en" ? "Boston (BOS)" : "", arrive: "2027-08-31", depart: "2027-09-04", passport: lang === "en" ? "SMITH JANE" : "",
         hotel: "need", checkin: "2027-08-31", checkout: "2027-09-04", room: lang === "en" ? "Single" : "싱글",
         bank: lang === "en" ? "Bank of America" : "국민은행", swift: "BOFAUS3N", account: "000123456789", holder: d.name, idCopy: { name: lang === "en" ? "passport.pdf" : "id.pdf" }, feeConsent: true,
-        material: { name: "slides.pptx" }, pub: "A",
+        mailSent: true, pub: "A",
       }));
       setSubmitted({ profile: new Date(2027, 6, 2, 13, 40), travel: new Date(2027, 6, 6, 10, 5), fee: new Date(2027, 7, 3, 11, 20), talk: new Date(2027, 7, 9, 18, 2) });
       setTab("final");
@@ -642,24 +641,21 @@ export default function SpeakerWizard({ lang = "ko" }) {
             </dl>
             <p className="notice">{S.specNote}</p>
 
-            <div className="field">
-              <label htmlFor="s-material">{S.file}</label>
-              <label className={`dropzone ${v.material ? "has" : ""}`} htmlFor="s-material">
-                <input id="s-material" type="file" accept=".pdf,.ppt,.pptx"
-                  onChange={(e) => set("material", e.target.files?.[0] || null)} />
-                {v.material ? (
-                  <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}{t.materialChange}</span></span>
-                ) : (
-                  <span>{t.materialPick}<br /><span className="hint">{S.fileHint}</span></span>
-                )}
-              </label>
-              <p className="hint">{S.bigTip}</p>
-              {err("material")}
+            <div className="mail-box">
+              <h3>✉ {S.mailTitle}</h3>
+              <dl>
+                {S.mailRows.map(([k, val, copyable]) => (
+                  <div key={k}><dt>{k}</dt><dd><span className={copyable ? "mono" : ""}>{val}</span>
+                    {copyable && <button type="button" className="copy-btn" onClick={(e) => { navigator.clipboard?.writeText(val); e.currentTarget.textContent = S.copied; }}>{S.copy}</button>}
+                  </dd></div>
+                ))}
+              </dl>
+              <p className="hint">{S.mailNote}</p>
             </div>
-            <div className="field">
-              <label htmlFor="s-materialLink">{S.linkLabel}<span className="opt">{t.optional}</span></label>
-              <input id="s-materialLink" name="materialLink" type="text" placeholder={S.linkPh} value={v.materialLink} onChange={onInput} maxLength={300} />
-            </div>
+            <label className="check-row confirm tight sent-check">
+              <input type="checkbox" checked={!!v.mailSent} onChange={(e) => set("mailSent", e.target.checked)} />
+              <span><b>{S.sent}</b><span className="opt">{t.optional}</span><br /><span className="hint">{S.sentHint}</span></span>
+            </label>
 
             <fieldset className="field">
               <legend>{S.pub}</legend>
@@ -674,15 +670,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
               {err("pub")}
             </fieldset>
 
-            {v.pub === "B" && (
-              <div className="field">
-                <label htmlFor="s-pubFile">{S.pubFile}<span className="opt">{t.optional}</span></label>
-                <label className={`dropzone small ${v.pubFile ? "has" : ""}`} htmlFor="s-pubFile">
-                  <input id="s-pubFile" type="file" accept=".pdf,.ppt,.pptx" onChange={(e) => set("pubFile", e.target.files?.[0] || null)} />
-                  {v.pubFile ? <span><b>{v.pubFile.name}</b></span> : <span><b>{P.upPick}</b> <span className="hint">· {S.pubFileHint}</span></span>}
-                </label>
-              </div>
-            )}
+            {v.pub === "B" && <p className="notice">{S.pubB}</p>}
 
             <div className="field">
               <label htmlFor="s-request">{t.request} <span className="opt">{t.optional}</span></label>
