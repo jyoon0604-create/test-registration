@@ -116,7 +116,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
     setInvited(true);
     setSessionInfo(d.session);
     setDeadlines(d.deadlines);
-    setToday(new Date((aug ? "2027-08-20" : DEMO_TODAY) + "T09:00:00"));
+    setToday(new Date((demo === "final" ? "2027-08-20" : DEMO_TODAY) + "T09:00:00"));
     setFeeEligible(params.get("fee") !== "n");
     setOpenTabs((o) => ({ ...o, fee: aug, final: aug }));
     if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
@@ -328,7 +328,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
           <div className="demo-ctl">
             <b>{t.demoBar.title}</b>
             <label><input type="checkbox" checked={feeEligible} onChange={(e) => setFeeEligible(e.target.checked)} /> {t.demoBar.fee}</label>
-            <label><input type="checkbox" checked={openTabs.final} onChange={(e) => { const on = e.target.checked; setOpenTabs((o) => ({ ...o, fee: on, final: on })); setToday(new Date((on ? "2027-08-20" : DEMO_TODAY) + "T09:00:00")); }} /> {t.demoBar.open}</label>
+            <label><input type="checkbox" checked={openTabs.final} onChange={(e) => { const on = e.target.checked; setOpenTabs((o) => ({ ...o, fee: on, final: on })); }} /> {t.demoBar.open}</label>
             <span className="hint">{hidden.length ? t.hiddenNote(hidden.join(", ")) + " · " : ""}{t.demoBar.hint}</span>
           </div>
         </div>

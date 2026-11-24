@@ -28,40 +28,68 @@ export default function SpeakerApp() {
     window.history.replaceState(null, "", url);
   }
 
+  const B = t.brand;
+  const toggle = (
+    <div className="lang-toggle" role="group" aria-label="Language">
+      {["ko", "en"].map((l) => (
+        <button key={l} type="button" aria-pressed={lang === l} className={lang === l ? "on" : ""} onClick={() => switchTo(l)}>
+          {l === "ko" ? "KOR" : "ENG"}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <main className="speaker-page">
-      <div className="sp-topbar">
-        <div className="wrap sp-topbar-in">
-          <b>{t.eventTitle}</b>
-          <div className="sp-topbar-right">
-            <span className="sp-topbar-label">{t.topbar}</span>
-            <div className="lang-toggle" role="group" aria-label="Language">
-              {["ko", "en"].map((l) => (
-                <button key={l} type="button" aria-pressed={lang === l} className={lang === l ? "on" : ""} onClick={() => switchTo(l)}>
-                  {l === "ko" ? "한국어" : "English"}
-                </button>
-              ))}
-            </div>
+    <main className="speaker-page gbc">
+      <header className="gbc-header">
+        <div className="gbc-stripe" aria-hidden />
+        <div className="wrap gbc-header-in">
+          {/* 공식 로고 파일이 오면 이 자리를 <img src="/gbc-logo.svg">로 바꿉니다. */}
+          <a className="gbc-logo" href="#" aria-label={B.name}>
+            <span className="gbc-mark" aria-hidden>GBC</span>
+            <span className="gbc-word"><b>{B.nameEn}</b><span>2027</span></span>
+          </a>
+          <div className="gbc-header-right">
+            <span className="gbc-portal">{B.portal}</span>
+            {toggle}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="wrap">
-        <section className="sp-intro">
-          <p className="eyebrow">SPEAKER GUIDE</p>
+      <section className="gbc-hero">
+        <div className="gbc-hero-bg" aria-hidden />
+        <div className="wrap gbc-hero-in">
+          <p className="gbc-kicker"><span>{B.short}</span>{B.official}</p>
           <h1>{t.pageTitle}</h1>
           <p className="subtitle">{t.subtitle}</p>
-          <dl className="sp-facts">
-            {t.facts.map(([dt, dd]) => <div key={dt}><dt>{dt}</dt><dd>{dd}</dd></div>)}
+          <dl className="gbc-meta">
+            <div><dt>{lang === "en" ? "Dates" : "일시"}</dt><dd>{t.heroWhen}</dd></div>
+            <div><dt>{lang === "en" ? "Venue" : "장소"}</dt><dd>{t.heroWhere}</dd></div>
+            <div><dt>{lang === "en" ? "Deadlines" : "제출 마감"}</dt><dd>{t.facts[1][1]}</dd></div>
           </dl>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <div className="wrap wizard-wrap">
         {ready && <SpeakerWizard lang={lang} />}
       </div>
 
-      <footer className="wrap footer">{t.footer}</footer>
+      <footer className="gbc-footer">
+        <div className="wrap gbc-footer-in">
+          <div>
+            <p className="gbc-footer-name">{lang === "en" ? B.name + " 2027" : t.eventTitle}</p>
+            <dl className="gbc-host">
+              {t.foot.host.map(([k, val]) => <div key={k}><dt>{k}</dt><dd>{val}</dd></div>)}
+            </dl>
+          </div>
+          <div className="gbc-contact">
+            <p><b>{t.foot.contact}</b></p>
+            <p>{t.foot.mail} · {t.foot.tel}</p>
+            <p>{t.foot.hours}</p>
+          </div>
+        </div>
+        <p className="wrap gbc-copy">{t.foot.copy}</p>
+      </footer>
     </main>
   );
 }
