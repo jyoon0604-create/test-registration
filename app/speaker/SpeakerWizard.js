@@ -7,10 +7,12 @@ import { TEXT, DEMO_SPEAKER, DEMO_TODAY } from "@/lib/speakerI18n";
 const ALL_TABS = ["profile", "travel", "fee", "talk", "final"];
 const FORM_TABS = ["profile", "travel", "fee", "talk"];
 const KEYS = {
-  profile: ["name", "nameEn", "email", "phone", "organization", "position", "bio", "photo", "consentPrivacy"],
+  profile: ["honor", "honorEtc", "name", "nameEn", "organization", "orgEn", "dept", "deptEn", "position", "posEn", "tel", "phone", "email",
+    "orgType", "orgTypeEtc", "field", "fieldEtc", "job", "jobEtc", "photo", "bio", "bioEn", "title", "titleEn", "summary", "level", "networking",
+    "consentPrivacy", "consentPortrait"],
   travel: ["flight", "from", "arrive", "depart", "flightNo", "passport", "hotel", "checkin", "checkout", "room", "diet", "travelNote"],
   fee: ["bank", "swift", "account", "holder", "bankAddr", "idCopy", "bankCopy", "feeConsent"],
-  talk: ["title", "summary", "material", "recording", "request"],
+  talk: ["material", "pub", "pubFile", "request"],
 };
 // 일정 안내 줄 ↔ 탭
 const TIMELINE_TAB = { register: "profile", travel: "travel", fee: "fee", slides: "talk" };
@@ -33,14 +35,32 @@ function validate(tab, v, t, lang) {
   const e = {};
   const E = t.err;
   if (tab === "profile") {
-    if (!v.name.trim()) e.name = E.name;
-    if (!EMAIL_RE.test(v.email.trim())) e.email = E.email;
+    const ko = lang === "ko";
+    const tbd = (x) => /^(미정|TBD)$/i.test(x.trim());
+    if (!v.honor) e.honor = E.honor;
+    if (ko && !v.name.trim()) e.name = E.name;
+    if (!v.nameEn.trim()) e.nameEn = E.nameEn;
+    if (ko && !v.organization.trim()) e.organization = E.organization;
+    if (!v.orgEn.trim()) e.orgEn = E.orgEn;
+    if (ko && !v.dept.trim()) e.dept = E.dept;
+    if (!v.deptEn.trim()) e.deptEn = E.deptEn;
+    if (ko && !v.position.trim()) e.position = E.position;
+    if (!v.posEn.trim()) e.posEn = E.posEn;
     if (!PHONE_RE.test(v.phone.trim())) e.phone = E.phone;
-    if (!v.organization.trim()) e.organization = E.organization;
-    if (!v.position.trim()) e.position = E.position;
+    if (!EMAIL_RE.test(v.email.trim())) e.email = E.email;
+    if (!v.orgType) e.orgType = E.orgType;
+    if (!v.field) e.field = E.field;
+    if (!v.job) e.job = E.job;
     if (!v.photo) e.photo = E.photo;
-    if (v.bio.trim().length < 20) e.bio = E.bio;
+    if (ko && v.bio.trim().length < 20) e.bio = E.bio;
+    if (v.bioEn.trim().length < 20) e.bioEn = E.bioEn;
+    if (ko && !v.title.trim()) e.title = E.title;
+    if (!v.titleEn.trim()) e.titleEn = E.titleEn;
+    if (!tbd(v.summary) && v.summary.trim().length < 20) e.summary = E.summary;
+    if (!v.level) e.level = E.level;
+    if (!v.networking) e.networking = E.networking;
     if (!v.consentPrivacy) e.consentPrivacy = E.consentPrivacy;
+    if (!v.consentPortrait) e.consentPortrait = E.consentPortrait;
   }
   if (tab === "travel") {
     if (!v.flight) e.flight = E.flight;
@@ -61,8 +81,8 @@ function validate(tab, v, t, lang) {
     if (!v.feeConsent) e.feeConsent = E.feeConsent;
   }
   if (tab === "talk") {
-    if (!v.title.trim()) e.title = E.title;
-    if (v.summary.trim().length < 20) e.summary = E.summary;
+    if (!v.material) e.material = E.material;
+    if (!v.pub) e.pub = E.pub;
   }
   return e;
 }
@@ -96,10 +116,12 @@ export default function SpeakerWizard({ lang = "ko" }) {
   const [resendSent, setResendSent] = useState(false);
   const topRef = useRef(null);
   const [v, setV] = useState({
-    name: "", nameEn: "", email: "", phone: "", organization: "", position: "", bio: "", photo: null, consentPrivacy: false,
+    honor: "", honorEtc: "", name: "", nameEn: "", organization: "", orgEn: "", dept: "", deptEn: "", position: "", posEn: "",
+    tel: "", phone: "", email: "", orgType: "", orgTypeEtc: "", field: "", fieldEtc: "", job: "", jobEtc: "",
+    bio: "", bioEn: "", title: "", titleEn: "", summary: "", level: "", networking: "", photo: null, consentPrivacy: false, consentPortrait: false,
     flight: "", from: "", arrive: "", depart: "", flightNo: "", passport: "", hotel: "", checkin: "", checkout: "", room: "", diet: "", travelNote: "",
     bank: "", swift: "", account: "", holder: "", bankAddr: "", idCopy: null, bankCopy: null, feeConsent: false,
-    title: "", summary: "", material: null, recording: "yes", request: "",
+    material: null, pub: "", pubFile: null, request: "",
   });
 
   useEffect(() => () => preview && preview.startsWith("blob:") && URL.revokeObjectURL(preview), [preview]);
@@ -121,7 +143,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
     setOpenTabs((o) => ({ ...o, fee: aug, final: aug }));
     if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
     if (demo === "return" || demo === "final") {
-      setV((s) => ({ ...s, ...d, photo: { name: "profile.jpg" }, consentPrivacy: true }));
+      setV((s) => ({ ...s, ...d, photo: { name: "profile.jpg" }, consentPrivacy: true, consentPortrait: true }));
       setSubmitted({ ...EMPTY_SUB, profile: new Date(2027, 6, 2, 13, 40) });
       setReturning(true);
       setTab(lang === "en" ? "travel" : "talk");
@@ -132,9 +154,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
         flight: "office", from: lang === "en" ? "Boston (BOS)" : "", arrive: "2027-08-31", depart: "2027-09-04", passport: lang === "en" ? "SMITH JANE" : "",
         hotel: "need", checkin: "2027-08-31", checkout: "2027-09-04", room: lang === "en" ? "Single" : "싱글",
         bank: lang === "en" ? "Bank of America" : "국민은행", swift: "BOFAUS3N", account: "000123456789", holder: d.name, idCopy: { name: lang === "en" ? "passport.pdf" : "id.pdf" }, feeConsent: true,
-        title: d.session.agenda,
-        summary: lang === "en" ? "Progress and outcomes of MFDS NAMs R&D, and our strategy for K-DDT, AI-based evaluation platforms and global regulatory collaboration." : "식약처 NAMs R&D 추진현황과 성과, K-DDT 구축·AI 기반 평가 플랫폼·글로벌 규제기관 협력 등 향후 추진전략을 소개합니다.",
-        material: { name: "slides.pptx" },
+        material: { name: "slides.pptx" }, pub: "A",
       }));
       setSubmitted({ profile: new Date(2027, 6, 2, 13, 40), travel: new Date(2027, 6, 6, 10, 5), fee: new Date(2027, 7, 3, 11, 20), talk: new Date(2027, 7, 9, 18, 2) });
       setTab("final");
@@ -157,9 +177,9 @@ export default function SpeakerWizard({ lang = "ko" }) {
         name: sp.name, email: sp.email, nameEn: sp.nameEn, phone: sp.phone, organization: sp.organization,
         position: sp.position, bio: sp.bio, consentPrivacy: !!sp.consent,
         photo: sp.photoUrl ? { name: "photo", url: sp.photoUrl } : null,
-        title: sp.title, summary: sp.summary,
+        title: sp.title || "", summary: sp.summary || "",
         material: sp.materialUrl ? { name: "slides", url: sp.materialUrl } : null,
-        recording: sp.recording === "동의하지 않음" ? "no" : "yes", request: sp.request,
+        request: sp.request || "",
       }));
       if (sp.photoUrl) setPreview(sp.photoUrl);
       const sub = { ...EMPTY_SUB, profile: parseAt(sp.profileAt), talk: parseAt(sp.talkAt) };
@@ -226,12 +246,12 @@ export default function SpeakerWizard({ lang = "ko" }) {
     fd.set("t", token);
     fd.set("section", sec);
     if (sec === "profile") {
-      for (const k of ["nameEn", "phone", "organization", "position", "bio"]) fd.set(k, v[k] || "");
+      for (const k of KEYS.profile) if (typeof v[k] === "string") fd.set(k, v[k]);
       fd.set("consentPrivacy", v.consentPrivacy ? "true" : "");
       if (v.photo instanceof File) fd.set("photo", v.photo);
       else fd.set("hasPhoto", v.photo ? "true" : "");
     } else {
-      for (const k of ["title", "summary", "recording", "request"]) fd.set(k, v[k] || "");
+      for (const k of ["pub", "request"]) fd.set(k, v[k] || "");
       if (v.material instanceof File) fd.set("material", v.material);
     }
     try {
@@ -300,7 +320,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
   );
   const radios = (name, lbl, opts) => (
     <fieldset className="field">
-      <legend>{lbl}</legend>
+      {lbl && <legend>{lbl}</legend>}
       <div className="radios stack">
         {opts.map(([val, txt]) => (
           <label key={val}><input id={opts[0][0] === val ? `s-${name}` : undefined} type="radio" name={name} value={val} checked={v[name] === val} onChange={onInput} /> {txt}</label>
@@ -316,6 +336,46 @@ export default function SpeakerWizard({ lang = "ko" }) {
         <input id={`s-${name}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => set(name, e.target.files?.[0] || null)} />
         {v[name] ? <span><b>{v[name].name}</b> <span className="hint">· {t.materialChange}</span></span> : <span><b>{P.upPick}</b> <span className="hint">· {P.upHint}</span></span>}
       </label>
+      {err(name)}
+    </div>
+  );
+
+  const R = t.reg;
+  const S = t.slides;
+  // 국문/영문 한 줄 (영문 페이지는 영문 칸만)
+  const pair = (koName, enName, lbl, ph) => lang === "en" ? textField(enName, lbl, ph[1]) : (
+    <div className="pair">
+      <p className="pair-label">{lbl}</p>
+      <div className="two-col">
+        <div className="field"><label htmlFor={`s-${koName}`} className="sub-label">{R.ko}</label>
+          <input id={`s-${koName}`} name={koName} type="text" placeholder={ph[0]} value={v[koName]} onChange={onInput} maxLength={150} aria-invalid={!!errors[koName]} />{err(koName)}</div>
+        <div className="field"><label htmlFor={`s-${enName}`} className="sub-label">{R.en}</label>
+          <input id={`s-${enName}`} name={enName} type="text" placeholder={ph[1]} value={v[enName]} onChange={onInput} maxLength={150} aria-invalid={!!errors[enName]} />{err(enName)}</div>
+      </div>
+    </div>
+  );
+  // 하나 고르기 (칩) + 마지막 "기타"는 직접 입력
+  const choice = (name, lbl, opts, etc) => (
+    <fieldset className="field">
+      <legend>{lbl}</legend>
+      <div className="chips">
+        {opts.map((o, i) => (
+          <label key={o} className={`chip ${v[name] === o ? "on" : ""}`}>
+            <input id={i === 0 ? `s-${name}` : undefined} type="radio" name={name} value={o} checked={v[name] === o} onChange={onInput} />{o}
+          </label>
+        ))}
+      </div>
+      {etc && v[name] === opts[opts.length - 1] && (
+        <input className="etc-input" name={`${name}Etc`} type="text" placeholder={R.etcPh} value={v[`${name}Etc`]} onChange={onInput} maxLength={60} aria-label={`${lbl} ${R.etcPh}`} />
+      )}
+      {err(name)}
+    </fieldset>
+  );
+  const area = (name, lbl, ph, rows, max, hint) => (
+    <div className="field">
+      <label htmlFor={`s-${name}`}>{lbl}</label>
+      <textarea id={`s-${name}`} name={name} rows={rows} value={v[name]} onChange={onInput} maxLength={max} placeholder={ph} aria-invalid={!!errors[name]} />
+      <p className="hint">{hint} · {v[name].trim() ? v[name].trim().split(/\s+/).length : 0}{lang === "en" ? " words" : "단어"}</p>
       {err(name)}
     </div>
   );
@@ -426,51 +486,79 @@ export default function SpeakerWizard({ lang = "ko" }) {
         {tab === "profile" && (
           <>
             <div className="panel-head"><h2>{t.profileTitle}</h2><Badge t={t} at={submitted.profile} dirty={dirty.profile} /></div>
-            <p className="muted">{t.profileSub}</p>
-            <div className="two-col">
-              {t.fields.map((f) => (
-                <div className={`field ${lang === "en" && f.name === "name" ? "full" : ""}`} key={f.name}>
-                  <label htmlFor={`s-${f.name}`}>{f.label}{f.optional && <span className="opt">{t.optional}</span>}</label>
-                  <input id={`s-${f.name}`} name={f.name} type={f.type || "text"} placeholder={f.placeholder}
-                    autoComplete={f.autoComplete} value={v[f.name]} onChange={onInput} maxLength={100}
-                    aria-invalid={!!errors[f.name]} readOnly={invited && f.name === "email"} />
-                  {invited && f.name === "email" && <p className="hint">{t.emailLocked}</p>}
-                  {err(f.name)}
-                </div>
-              ))}
-            </div>
+            <p className="muted">{R.sub}</p>
 
-            <div className="field">
-              <label htmlFor="s-photo">{t.photo}</label>
-              <div className="photo">
-                <div className="thumb">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
-                <div>
-                  <input id="s-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhoto} aria-invalid={!!errors.photo} />
-                  <p className="hint">{v.photo && !(v.photo instanceof File) ? `${v.photo.name} · ` : ""}{t.photoHint}</p>
+            <section className="reg-sec">
+              <h3>{R.s1}</h3>
+              <p className="hint reg-note">※ {R.s1note}</p>
+              {choice("honor", R.honor, R.honorOpts, true)}
+              {pair("name", "nameEn", R.name, R.namePh)}
+              {pair("organization", "orgEn", R.org, R.orgPh)}
+              {pair("dept", "deptEn", R.dept, R.deptPh)}
+              {pair("position", "posEn", R.pos, R.posPh)}
+              <div className="two-col">
+                {textField("phone", R.mobile, R.mobilePh, false, "tel")}
+                {textField("tel", R.tel, R.telPh, true, "tel")}
+                <div className="field full">
+                  <label htmlFor="s-email">{R.email}</label>
+                  <input id="s-email" name="email" type="email" value={v.email} readOnly={invited} onChange={onInput} />
+                  {invited && <p className="hint">{t.emailLocked}</p>}
+                  {err("email")}
                 </div>
               </div>
-              {err("photo")}
-            </div>
+              {choice("orgType", R.orgType, R.orgTypeOpts, true)}
+              {choice("field", R.field, R.fieldOpts, true)}
+              {choice("job", R.job, R.jobOpts, true)}
+              <div className="field">
+                <label htmlFor="s-photo">{t.photo}</label>
+                <div className="photo">
+                  <div className="thumb">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
+                  <div>
+                    <input id="s-photo" type="file" accept="image/jpeg,image/png" onChange={onPhoto} aria-invalid={!!errors.photo} />
+                    <p className="hint">{v.photo && !(v.photo instanceof File) ? `${v.photo.name} · ` : ""}{R.photoHint}</p>
+                  </div>
+                </div>
+                {err("photo")}
+              </div>
+            </section>
 
-            <div className="field">
-              <label htmlFor="s-bio">{t.bio}</label>
-              <textarea id="s-bio" name="bio" rows={5} value={v.bio} onChange={onInput} maxLength={800}
-                placeholder={t.bioPh} aria-invalid={!!errors.bio} />
-              <p className="hint">{t.bioHint(v.bio.length)}</p>
-              {err("bio")}
-            </div>
+            <section className="reg-sec">
+              <h3>{R.s2}</h3>
+              <p className="hint reg-note">※ {R.s2note}</p>
+              {lang === "ko" && area("bio", `${t.bio} · ${R.ko}`, R.bioPh[0], 5, 1500, R.words(150))}
+              {area("bioEn", lang === "ko" ? `${t.bio} · ${R.en}` : t.bio, R.bioPh[1], 5, 1500, R.words(150))}
+            </section>
 
-            <div className="consent">
-              <p className="consent-text">
-                <b>{t.consentTitle}</b><br />
-                {t.consentBody.map((line) => <span key={line}>{line}<br /></span>)}
-              </p>
-              <label className="check-row">
+            <section className="reg-sec">
+              <h3>{R.s3}</h3>
+              <p className="hint reg-note">※ {R.s3note}</p>
+              {pair("title", "titleEn", R.talkTitle, R.titlePh)}
+              {area("summary", R.abstract, R.abstractPh, 6, 2000, R.words(200))}
+              {choice("level", R.level, R.levelOpts)}
+            </section>
+
+            <section className="reg-sec">
+              <h3>{R.s4}</h3>
+              <p className="reg-q">{R.s4q}</p>
+              {radios("networking", "", R.netOpts)}
+            </section>
+
+            <section className="reg-sec">
+              <h3>{R.s5}</h3>
+              <dl className="consent-table">
+                {R.consentRows.map(([k, val]) => <div key={k}><dt>{k}</dt><dd>{val}</dd></div>)}
+              </dl>
+              <label className="check-row confirm">
                 <input id="s-consentPrivacy" type="checkbox" name="consentPrivacy" checked={v.consentPrivacy} onChange={onInput} />
-                <span>{t.consentAgree}</span>
+                <span>{R.consentAgree}</span>
               </label>
               {err("consentPrivacy")}
-            </div>
+              <label className="check-row confirm tight">
+                <input id="s-consentPortrait" type="checkbox" name="consentPortrait" checked={v.consentPortrait} onChange={onInput} />
+                <span>{R.portraitAgree}</span>
+              </label>
+              {err("consentPortrait")}
+            </section>
           </>
         )}
 
@@ -542,48 +630,54 @@ export default function SpeakerWizard({ lang = "ko" }) {
             <div className="panel-head"><h2>{t.talkTitle}</h2><Badge t={t} at={submitted.talk} dirty={dirty.talk} /></div>
             <p className="muted">{t.talkSub}</p>
 
-            {sessionInfo && (
+            {(v.titleEn || v.title) && (
               <div className="session-mini">
-                <span>{t.si.forum}</span><b>{sessionInfo.forum}</b>
-                <span>{t.si.when}</span><b>{sessionInfo.when}</b>
+                <span>{R.talkTitle}</span><b>{lang === "en" ? v.titleEn : v.title || v.titleEn}</b>
+                {sessionInfo && <><span>{t.si.when}</span><b>{sessionInfo.when}</b></>}
               </div>
             )}
 
-            <div className="field">
-              <label htmlFor="s-title">{t.talkName}</label>
-              <input id="s-title" name="title" type="text" value={v.title} onChange={onInput} maxLength={120}
-                placeholder={t.talkNamePh} aria-invalid={!!errors.title} />
-              {err("title")}
-            </div>
+            <dl className="spec-grid">
+              {S.specs.map(([k, val]) => <div key={k}><dt>{k}</dt><dd>{val}</dd></div>)}
+            </dl>
+            <p className="notice">{S.specNote}</p>
 
             <div className="field">
-              <label htmlFor="s-summary">{t.summary}</label>
-              <textarea id="s-summary" name="summary" rows={4} value={v.summary} onChange={onInput} maxLength={600}
-                placeholder={t.summaryPh} aria-invalid={!!errors.summary} />
-              <p className="hint">{t.summaryHint(v.summary.length)}</p>
-              {err("summary")}
-            </div>
-
-            <div className="field">
-              <label htmlFor="s-material">{t.material} <span className="opt">{t.materialOpt}</span></label>
+              <label htmlFor="s-material">{S.file}</label>
               <label className={`dropzone ${v.material ? "has" : ""}`} htmlFor="s-material">
                 <input id="s-material" type="file" accept=".pdf,.ppt,.pptx"
                   onChange={(e) => set("material", e.target.files?.[0] || null)} />
                 {v.material ? (
                   <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}{t.materialChange}</span></span>
                 ) : (
-                  <span>{t.materialPick}<br /><span className="hint">{t.materialHint}</span></span>
+                  <span>{t.materialPick}<br /><span className="hint">PDF · PPT · PPTX</span></span>
                 )}
               </label>
+              {err("material")}
             </div>
 
             <fieldset className="field">
-              <legend>{t.recording}</legend>
-              <div className="radios">
-                <label><input type="radio" name="recording" value="yes" checked={v.recording === "yes"} onChange={onInput} /> {t.yes}</label>
-                <label><input type="radio" name="recording" value="no" checked={v.recording === "no"} onChange={onInput} /> {t.no}</label>
+              <legend>{S.pub}</legend>
+              <div className="option-cards">
+                {S.pubOpts.map(([val, head, desc], i) => (
+                  <label key={val} className={`option-card ${v.pub === val ? "on" : ""}`}>
+                    <input id={i === 0 ? "s-pub" : undefined} type="radio" name="pub" value={val} checked={v.pub === val} onChange={onInput} />
+                    <span><b>{head}</b><span>{desc}</span></span>
+                  </label>
+                ))}
               </div>
+              {err("pub")}
             </fieldset>
+
+            {v.pub === "B" && (
+              <div className="field">
+                <label htmlFor="s-pubFile">{S.pubFile}<span className="opt">{t.optional}</span></label>
+                <label className={`dropzone small ${v.pubFile ? "has" : ""}`} htmlFor="s-pubFile">
+                  <input id="s-pubFile" type="file" accept=".pdf,.ppt,.pptx" onChange={(e) => set("pubFile", e.target.files?.[0] || null)} />
+                  {v.pubFile ? <span><b>{v.pubFile.name}</b></span> : <span><b>{P.upPick}</b> <span className="hint">· {S.pubFileHint}</span></span>}
+                </label>
+              </div>
+            )}
 
             <div className="field">
               <label htmlFor="s-request">{t.request} <span className="opt">{t.optional}</span></label>
@@ -607,7 +701,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
               <div className="fi-hero-main">
                 <p className="fi-label">{F.myTalk(v.name)}</p>
                 <p className="fi-time">{sessionInfo?.when}</p>
-                <p className="fi-title">{v.title || sessionInfo?.agenda}</p>
+                <p className="fi-title">{(lang === "en" ? v.titleEn : v.title) || sessionInfo?.agenda}</p>
                 <div className="fi-chips"><span>{sessionInfo?.forum}</span></div>
               </div>
               <div className="fi-hero-side">

@@ -483,3 +483,42 @@ select { width: 100%; padding: 10px 12px; font: inherit; font-size: 15px; backgr
   .gbc-meta div { border-right: 0; border-bottom: 1px solid var(--border); }
   .gbc-meta div:last-child { border-bottom: 0; }
 }
+
+/* v9: GBC 등록양식 기준 기본정보 */
+.reg-sec { padding: 22px 0 6px; border-top: 1px solid var(--border); margin-top: 18px; }
+.reg-sec:first-of-type { border-top: 0; margin-top: 4px; padding-top: 8px; }
+.reg-sec > h3 { margin: 0 0 4px; font-size: 17px; color: var(--gbc-navy, var(--text)); }
+.reg-note { margin: 0 0 16px; }
+.reg-q { font-size: 14px; margin: 6px 0 10px; }
+.pair { margin-bottom: 4px; }
+.pair-label { font-weight: 600; font-size: 14px; margin: 0 0 6px; }
+.field label.sub-label { font-weight: 500; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.chips .chip { font-size: 13px; padding: 7px 12px; }
+.etc-input { margin-top: 8px; max-width: 320px; }
+.consent-table { margin: 8px 0 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.consent-table div { display: grid; grid-template-columns: 140px 1fr; border-top: 1px solid var(--border); }
+.consent-table div:first-child { border-top: 0; }
+.consent-table dt { background: var(--soft); padding: 10px 12px; font-weight: 600; }
+.consent-table dd { margin: 0; padding: 10px 12px; color: var(--muted); line-height: 1.6; }
+.confirm.tight { margin-top: 10px; }
+.spec-grid { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 12px; border: 1px solid var(--border); border-radius: 10px; }
+.spec-grid div { padding: 12px 14px; border-right: 1px solid var(--border); }
+.spec-grid div:last-child { border-right: 0; }
+.spec-grid dt { font-size: 12px; font-weight: 700; color: var(--gbc-blue, var(--primary)); }
+.spec-grid dd { margin: 4px 0 0; font-weight: 600; font-size: 14px; }
+.option-cards { display: grid; gap: 10px; }
+.option-card { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-weight: 400 !important; }
+.option-card input { margin-top: 3px; accent-color: var(--primary); }
+.option-card b { display: block; font-size: 15px; margin-bottom: 2px; }
+.option-card span span { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.option-card.on { border-color: var(--primary); background: var(--soft); }
+@media (max-width: 640px) {
+  .consent-table div { grid-template-columns: 1fr; }
+  .consent-table dt { padding-bottom: 4px; }
+  .spec-grid { grid-template-columns: 1fr 1fr; }
+  .spec-grid div:nth-child(2) { border-right: 0; }
+  .spec-grid div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
+.field .chip { display: inline-flex; margin: 0; font-weight: 400; }
+.field .chip.on { font-weight: 600; }
+.field .option-card { display: flex; margin: 0; }
