@@ -2,8 +2,8 @@
 
 참석자가 등록 폼을 제출하면 다음이 자동으로 처리됩니다.
 
-1. 사진을 **Vercel Blob**에 저장
-2. 등록 정보와 사진 링크를 **Google 시트**에 한 줄 추가
+1. 사진을 **Vercel Blob**(Private)에 저장
+2. 등록 정보와 사진 보기 링크를 **Google 시트**에 한 줄 추가
 3. 입력한 이메일로 **등록 확인 메일** 발송 (메일플러그 SMTP)
 
 행사 정보(가상 일정: 2026년 12월 15일 화 14:00~17:00)는 `lib/event.js`에서 고칠 수 있어요.
@@ -19,7 +19,8 @@
 
 ### 2. Vercel 연결
 1. Vercel에서 [Add New] > [Project]로 이 저장소를 가져옵니다. 설정은 기본값 그대로 두면 됩니다.
-2. 프로젝트의 [Storage] 탭에서 **Blob** 저장소를 만들어 연결합니다. `BLOB_READ_WRITE_TOKEN`이 자동으로 들어갑니다.
+2. 프로젝트의 [Storage] 탭에서 **Blob** 저장소를 만들어 연결합니다. (Private 권장. 환경변수 접두어는 기본값 그대로)
+   - Public 저장소를 쓴다면 환경변수 `BLOB_ACCESS=public`을 추가합니다.
 3. [Settings] > [Environment Variables]에 아래 값을 넣습니다.
 
 | 이름 | 값 |
@@ -45,5 +46,6 @@ npm run dev                  # http://localhost:3000
 로컬에서 `BLOB_READ_WRITE_TOKEN`이 없으면 사진은 저장하지 않고 넘어갑니다.
 
 ## 개인정보 주의
-- 사진은 링크를 아는 사람만 볼 수 있는 공개 URL(추측하기 어려운 주소)로 저장됩니다. 시트 공유 범위를 담당자로 제한해 주세요.
+- 사진은 Private Blob에 저장되고, 시트에는 서명된 보기 링크(`/api/photo?p=…&s=…`)가 남습니다. 링크를 아는 사람은 사진을 볼 수 있으니 시트 공유 범위를 담당자로 제한해 주세요.
+- 링크 서명에는 `SHEET_WEBHOOK_SECRET`을 씁니다. 이 값을 바꾸면 예전 사진 링크는 열리지 않습니다. (`PHOTO_LINK_SECRET`을 따로 두면 그 값을 사용)
 - 폼의 개인정보 안내 문구(보유 기간 등)는 회사 정책에 맞게 `app/RegistrationForm.js`에서 고쳐 주세요.
