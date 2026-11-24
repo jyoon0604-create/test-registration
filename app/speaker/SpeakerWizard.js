@@ -3,14 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { TEXT, DEMO_SPEAKER, DEMO_TODAY } from "@/lib/speakerI18n";
 
-const SECTION_OF_STEP = { 1: "profile", 2: "talk" };
-const PROFILE_KEYS = ["name", "nameEn", "email", "phone", "organization", "position", "bio", "photo", "consentPrivacy"];
-const TALK_KEYS = ["session", "title", "summary", "material", "rehearsal", "recording", "request"];
+// 탭 순서 (t.steps 순서와 같아요)
+const ALL_TABS = ["profile", "travel", "fee", "talk", "final"];
+const FORM_TABS = ["profile", "travel", "fee", "talk"];
+const KEYS = {
+  profile: ["name", "nameEn", "email", "phone", "organization", "position", "bio", "photo", "consentPrivacy"],
+  travel: ["flight", "from", "arrive", "depart", "flightNo", "passport", "hotel", "checkin", "checkout", "room", "diet", "travelNote"],
+  fee: ["bank", "swift", "account", "holder", "bankAddr", "idCopy", "bankCopy", "feeConsent"],
+  talk: ["title", "summary", "material", "recording", "request"],
+};
+// 일정 안내 줄 ↔ 탭
+const TIMELINE_TAB = { register: "profile", travel: "travel", fee: "fee", slides: "talk" };
 
 // 디자인 미리보기 (?demo=…, 언어는 ?lang=en)
-//  link   : 개인 링크로 처음 들어온 연사
+//  link   : 개인 링크로 처음 들어온 연사 (8월 전: 연사료·최종 안내 숨김)
 //  return : 기본정보만 제출하고 다시 들어온 연사
-//  final  : 모두 제출했고 "최종 안내"가 열린 연사
+//  final  : 8월 이후, 모두 제출했고 최종 안내가 열린 연사
+//  &fee=n : 연사료 대상이 아닌 연사,  &open=aug : 8월 이후 상태
 
 function parseAt(s) {
   const m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
@@ -20,11 +29,10 @@ function parseAt(s) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9+\-\s()]{8,20}$/;
 
-function validate(step, v, t) {
+function validate(tab, v, t, lang) {
   const e = {};
   const E = t.err;
-  if (step === 0 && !v.guideRead) e.guideRead = E.guideRead;
-  if (step === 1) {
+  if (tab === "profile") {
     if (!v.name.trim()) e.name = E.name;
     if (!EMAIL_RE.test(v.email.trim())) e.email = E.email;
     if (!PHONE_RE.test(v.phone.trim())) e.phone = E.phone;
@@ -34,28 +42,50 @@ function validate(step, v, t) {
     if (v.bio.trim().length < 20) e.bio = E.bio;
     if (!v.consentPrivacy) e.consentPrivacy = E.consentPrivacy;
   }
-  if (step === 2) {
+  if (tab === "travel") {
+    if (!v.flight) e.flight = E.flight;
+    if (v.flight && v.flight !== "none") {
+      if (!v.from.trim()) e.from = E.from;
+      if (!v.arrive) e.arrive = E.arrive;
+      if (!v.depart) e.depart = E.depart;
+    }
+    if (!v.hotel) e.hotel = E.hotel;
+    if (v.hotel === "need" && (!v.checkin || !v.checkout)) e.checkin = E.checkin;
+  }
+  if (tab === "fee") {
+    if (!v.bank.trim()) e.bank = E.bank;
+    if (lang === "en" && !v.swift.trim()) e.swift = E.swift;
+    if (!v.account.trim()) e.account = E.account;
+    if (!v.holder.trim()) e.holder = E.holder;
+    if (!v.idCopy) e.idCopy = E.idCopy;
+    if (!v.feeConsent) e.feeConsent = E.feeConsent;
+  }
+  if (tab === "talk") {
     if (!v.title.trim()) e.title = E.title;
     if (v.summary.trim().length < 20) e.summary = E.summary;
   }
   return e;
 }
 
+const EMPTY_SUB = { profile: null, travel: null, fee: null, talk: null };
+const NO_DIRTY = { profile: false, travel: false, fee: false, talk: false };
+
 export default function SpeakerWizard({ lang = "ko" }) {
   const t = TEXT[lang];
-  const [step, setStep] = useState(0);
-  const [started, setStarted] = useState(false);
+  const [tab, setTab] = useState("profile");
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
   const [preview, setPreview] = useState(null);
-  const [submitted, setSubmitted] = useState({ profile: null, talk: null }); // 제출 시각
-  const [dirty, setDirty] = useState({ profile: false, talk: false }); // 제출 뒤 고친 내용이 있는지
+  const [submitted, setSubmitted] = useState(EMPTY_SUB); // 탭별 제출 시각
+  const [dirty, setDirty] = useState(NO_DIRTY); // 제출 뒤 고친 내용이 있는지
   const [justSaved, setJustSaved] = useState(null);
   const [returning, setReturning] = useState(false);
   const [invited, setInvited] = useState(false); // 개인 링크로 들어왔는지
-  const [finalOpen, setFinalOpen] = useState(false); // 담당자가 최종 안내를 공개했는지
+  // 탭 노출: 시트 "탭 공개" 표(전체) + 연사별 칸(언어, 연사료 대상)
+  const [openTabs, setOpenTabs] = useState({ profile: true, travel: true, fee: false, talk: true, final: false });
+  const [feeEligible, setFeeEligible] = useState(true);
   const [sessionInfo, setSessionInfo] = useState(null); // 담당자가 연사별로 넣는 세션 정보
-  const [deadlines, setDeadlines] = useState(null); // 연사별 마감일 { register, travel, slides } (YYYY-MM-DD)
+  const [deadlines, setDeadlines] = useState(null); // 연사별 마감일 (YYYY-MM-DD)
   const [today, setToday] = useState(() => new Date());
   const [token, setToken] = useState("");
   const [demoMode, setDemoMode] = useState(false);
@@ -66,9 +96,10 @@ export default function SpeakerWizard({ lang = "ko" }) {
   const [resendSent, setResendSent] = useState(false);
   const topRef = useRef(null);
   const [v, setV] = useState({
-    guideRead: false,
     name: "", nameEn: "", email: "", phone: "", organization: "", position: "", bio: "", photo: null, consentPrivacy: false,
-    session: "", title: "", summary: "", material: null, rehearsal: [], recording: "yes", request: "",
+    flight: "", from: "", arrive: "", depart: "", flightNo: "", passport: "", hotel: "", checkin: "", checkout: "", room: "", diet: "", travelNote: "",
+    bank: "", swift: "", account: "", holder: "", bankAddr: "", idCopy: null, bankCopy: null, feeConsent: false,
+    title: "", summary: "", material: null, recording: "yes", request: "",
   });
 
   useEffect(() => () => preview && preview.startsWith("blob:") && URL.revokeObjectURL(preview), [preview]);
@@ -80,29 +111,38 @@ export default function SpeakerWizard({ lang = "ko" }) {
     if (tk) { loadSpeaker(tk); return; }
     if (!demo) return;
     const d = DEMO_SPEAKER[lang];
+    const aug = demo === "final" || params.get("open") === "aug";
     setDemoMode(true);
     setInvited(true);
     setSessionInfo(d.session);
     setDeadlines(d.deadlines);
-    setToday(new Date(DEMO_TODAY + "T09:00:00"));
+    setToday(new Date((aug ? "2027-08-20" : DEMO_TODAY) + "T09:00:00"));
+    setFeeEligible(params.get("fee") !== "n");
+    setOpenTabs((o) => ({ ...o, fee: aug, final: aug }));
     if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
     if (demo === "return" || demo === "final") {
-      setV((s) => ({ ...s, ...d, session: d.session.forum, photo: { name: "profile.jpg" }, consentPrivacy: true, guideRead: true }));
-      setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: null });
-      setStarted(true);
+      setV((s) => ({ ...s, ...d, photo: { name: "profile.jpg" }, consentPrivacy: true }));
+      setSubmitted({ ...EMPTY_SUB, profile: new Date(2027, 6, 2, 13, 40) });
       setReturning(true);
-      setStep(2);
+      setTab(lang === "en" ? "travel" : "talk");
     }
     if (demo === "final") {
-      setV((s) => ({ ...s, title: d.session.agenda, summary: lang === "en" ? "Progress and outcomes of MFDS NAMs R&D, and our strategy for K-DDT, AI-based evaluation platforms and global regulatory collaboration." : "식약처 NAMs R&D 추진현황과 성과, K-DDT 구축·AI 기반 평가 플랫폼·글로벌 규제기관 협력 등 향후 추진전략을 소개합니다.", material: { name: "slides.pptx" } }));
-      setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: new Date(2026, 10, 26, 10, 5) });
-      setFinalOpen(true);
-      setStep(4);
+      setV((s) => ({
+        ...s,
+        flight: "office", from: lang === "en" ? "Boston (BOS)" : "", arrive: "2027-08-31", depart: "2027-09-04", passport: lang === "en" ? "SMITH JANE" : "",
+        hotel: "need", checkin: "2027-08-31", checkout: "2027-09-04", room: lang === "en" ? "Single" : "싱글",
+        bank: lang === "en" ? "Bank of America" : "국민은행", swift: "BOFAUS3N", account: "000123456789", holder: d.name, idCopy: { name: lang === "en" ? "passport.pdf" : "id.pdf" }, feeConsent: true,
+        title: d.session.agenda,
+        summary: lang === "en" ? "Progress and outcomes of MFDS NAMs R&D, and our strategy for K-DDT, AI-based evaluation platforms and global regulatory collaboration." : "식약처 NAMs R&D 추진현황과 성과, K-DDT 구축·AI 기반 평가 플랫폼·글로벌 규제기관 협력 등 향후 추진전략을 소개합니다.",
+        material: { name: "slides.pptx" },
+      }));
+      setSubmitted({ profile: new Date(2027, 6, 2, 13, 40), travel: new Date(2027, 6, 6, 10, 5), fee: new Date(2027, 7, 3, 11, 20), talk: new Date(2027, 7, 9, 18, 2) });
+      setTab("final");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 개인 링크(?t=…)로 들어오면 시트에 저장된 내용을 불러옵니다.
+  // 개인 링크(?t=…)로 들어오면 시트에 저장된 내용을 불러옵니다. (지금은 기본정보·발표자료만 연결)
   async function loadSpeaker(tk) {
     setLoading(true);
     try {
@@ -117,19 +157,16 @@ export default function SpeakerWizard({ lang = "ko" }) {
         name: sp.name, email: sp.email, nameEn: sp.nameEn, phone: sp.phone, organization: sp.organization,
         position: sp.position, bio: sp.bio, consentPrivacy: !!sp.consent,
         photo: sp.photoUrl ? { name: "photo", url: sp.photoUrl } : null,
-        session: sp.session, title: sp.title, summary: sp.summary,
+        title: sp.title, summary: sp.summary,
         material: sp.materialUrl ? { name: "slides", url: sp.materialUrl } : null,
-        rehearsal: sp.rehearsal ? sp.rehearsal.split(", ").filter(Boolean) : [],
         recording: sp.recording === "동의하지 않음" ? "no" : "yes", request: sp.request,
       }));
       if (sp.photoUrl) setPreview(sp.photoUrl);
-      const sub = { profile: parseAt(sp.profileAt), talk: parseAt(sp.talkAt) };
+      const sub = { ...EMPTY_SUB, profile: parseAt(sp.profileAt), talk: parseAt(sp.talkAt) };
       setSubmitted(sub);
       if (sub.profile || sub.talk) {
         setReturning(true);
-        setStarted(true);
-        setV((s) => ({ ...s, guideRead: true }));
-        setStep(!sub.profile ? 1 : !sub.talk ? 2 : 3);
+        setTab(!sub.profile ? "profile" : "talk");
       }
     } catch {
       setLinkError(t.linkErrorTitle);
@@ -138,35 +175,32 @@ export default function SpeakerWizard({ lang = "ko" }) {
     }
   }
 
+  // 이 연사에게 보이는 탭
+  const showTab = (k) => openTabs[k] && (k !== "travel" || lang === "en") && (k !== "fee" || feeEligible);
+  const tabs = ALL_TABS.filter(showTab);
+  const formTabs = FORM_TABS.filter(showTab);
+  const doneCount = formTabs.filter((k) => submitted[k] && !dirty[k]).length;
+  const allDone = doneCount === formTabs.length;
+  const label = (k) => t.steps[ALL_TABS.indexOf(k)];
+
+  // 미리보기 설정에서 탭이 숨겨지면 보이는 탭으로 옮겨요.
+  useEffect(() => {
+    if (!tabs.includes(tab)) setTab(tabs[0]);
+  }, [tab, tabs]);
+
   function set(name, value) {
     setV((s) => ({ ...s, [name]: value }));
     if (errors[name]) setErrors((er) => ({ ...er, [name]: undefined }));
-    const sec = PROFILE_KEYS.includes(name) ? "profile" : TALK_KEYS.includes(name) ? "talk" : null;
+    const sec = FORM_TABS.find((k) => KEYS[k].includes(name));
     if (sec) { setDirty((d) => ({ ...d, [sec]: true })); setJustSaved(null); }
   }
   const onInput = (e) => set(e.target.name, e.target.type === "checkbox" ? e.target.checked : e.target.value);
 
   function go(next) {
-    setStep(next);
+    setTab(next);
     setErrors({});
     setJustSaved(null);
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function check() {
-    const e = validate(step, v, t);
-    setErrors(e);
-    if (Object.keys(e).length) {
-      document.getElementById(`s-${Object.keys(e)[0]}`)?.focus();
-      return false;
-    }
-    return true;
-  }
-
-  function start() {
-    if (!check()) return;
-    setStarted(true);
-    go(1);
   }
 
   function markSaved(sec, at) {
@@ -178,11 +212,13 @@ export default function SpeakerWizard({ lang = "ko" }) {
 
   async function saveSection() {
     setServerMessage("");
-    if (!check()) return;
-    const sec = SECTION_OF_STEP[step];
+    const e = validate(tab, v, t, lang);
+    setErrors(e);
+    if (Object.keys(e).length) { document.getElementById(`s-${Object.keys(e)[0]}`)?.focus(); return; }
+    const sec = tab;
     setSending(true);
-    if (!token) {
-      // 디자인 미리보기: 실제 저장 없이 저장된 것처럼 보여줍니다.
+    if (!token || sec === "travel" || sec === "fee") {
+      // 디자인 미리보기: 실제 저장 없이 저장된 것처럼 보여줍니다. (항공·숙박·연사료는 아직 미연결)
       setTimeout(() => { setSending(false); markSaved(sec, new Date()); }, 500);
       return;
     }
@@ -195,8 +231,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
       if (v.photo instanceof File) fd.set("photo", v.photo);
       else fd.set("hasPhoto", v.photo ? "true" : "");
     } else {
-      for (const k of ["session", "title", "summary", "recording", "request"]) fd.set(k, v[k] || "");
-      v.rehearsal.forEach((r) => fd.append("rehearsal", r));
+      for (const k of ["title", "summary", "recording", "request"]) fd.set(k, v[k] || "");
       if (v.material instanceof File) fd.set("material", v.material);
     }
     try {
@@ -218,18 +253,11 @@ export default function SpeakerWizard({ lang = "ko" }) {
     }
   }
 
-  function stateOf(i) {
-    if (i === 0) return started ? "done" : step === 0 ? "current" : "todo";
-    if (i === 3) return submitted.profile && submitted.talk && !dirty.profile && !dirty.talk ? "done" : "todo";
-    if (i === 4) return "final";
-    const sec = SECTION_OF_STEP[i];
-    if (submitted[sec] && !dirty[sec]) return "done";
-    if (dirty[sec]) return "draft";
+  function stateOf(k) {
+    if (k === "final") return "final";
+    if (submitted[k] && !dirty[k]) return "done";
+    if (dirty[k]) return "draft";
     return "todo";
-  }
-
-  function toggleRehearsal(opt) {
-    set("rehearsal", v.rehearsal.includes(opt) ? v.rehearsal.filter((x) => x !== opt) : [...v.rehearsal, opt]);
   }
 
   function onPhoto(e) {
@@ -255,12 +283,56 @@ export default function SpeakerWizard({ lang = "ko" }) {
   }
 
   const err = (k) => errors[k] && <p className="error" id={`e-${k}`}>{errors[k]}</p>;
-  const steps = t.steps.slice(0, finalOpen ? 5 : 4);
   const F = t.final;
+  const T = t.travel;
+  const P = t.fee;
+  const idx = tabs.indexOf(tab);
+  const nextTab = tabs[idx + 1];
+  const hidden = ALL_TABS.filter((k) => !showTab(k)).map((k) => label(k)[0]);
+  const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const textField = (name, lbl, ph, opt, type = "text") => (
+    <div className="field" key={name}>
+      <label htmlFor={`s-${name}`}>{lbl}{opt && <span className="opt">{t.optional}</span>}</label>
+      <input id={`s-${name}`} name={name} type={type} placeholder={ph} value={v[name]} onChange={onInput} maxLength={120} aria-invalid={!!errors[name]} />
+      {err(name)}
+    </div>
+  );
+  const radios = (name, lbl, opts) => (
+    <fieldset className="field">
+      <legend>{lbl}</legend>
+      <div className="radios stack">
+        {opts.map(([val, txt]) => (
+          <label key={val}><input id={opts[0][0] === val ? `s-${name}` : undefined} type="radio" name={name} value={val} checked={v[name] === val} onChange={onInput} /> {txt}</label>
+        ))}
+      </div>
+      {err(name)}
+    </fieldset>
+  );
+  const upload = (name, lbl, opt) => (
+    <div className="field">
+      <label htmlFor={`s-${name}`}>{lbl}{opt && <span className="opt">{t.optional}</span>}</label>
+      <label className={`dropzone small ${v[name] ? "has" : ""}`} htmlFor={`s-${name}`}>
+        <input id={`s-${name}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => set(name, e.target.files?.[0] || null)} />
+        {v[name] ? <span><b>{v[name].name}</b> <span className="hint">· {t.materialChange}</span></span> : <span><b>{P.upPick}</b> <span className="hint">· {P.upHint}</span></span>}
+      </label>
+      {err(name)}
+    </div>
+  );
 
   return (
     <section className="card wizard" ref={topRef}>
-      {demoMode && <p className="preview-badge">{t.previewBadge}</p>}
+      {demoMode && (
+        <div className="demo-bar">
+          <p className="preview-badge">{t.previewBadge}</p>
+          <div className="demo-ctl">
+            <b>{t.demoBar.title}</b>
+            <label><input type="checkbox" checked={feeEligible} onChange={(e) => setFeeEligible(e.target.checked)} /> {t.demoBar.fee}</label>
+            <label><input type="checkbox" checked={openTabs.final} onChange={(e) => { const on = e.target.checked; setOpenTabs((o) => ({ ...o, fee: on, final: on })); setToday(new Date((on ? "2027-08-20" : DEMO_TODAY) + "T09:00:00")); }} /> {t.demoBar.open}</label>
+            <span className="hint">{hidden.length ? t.hiddenNote(hidden.join(", ")) + " · " : ""}{t.demoBar.hint}</span>
+          </div>
+        </div>
+      )}
 
       {!invited && (
         <div className="resume">
@@ -286,58 +358,27 @@ export default function SpeakerWizard({ lang = "ko" }) {
       )}
 
       {invited && (
-        <div className={`welcome ${finalOpen ? "final" : ""}`} role="status">
-          {finalOpen ? t.welcomeFinal(v.name) : returning ? t.welcomeBack(v.name) : t.welcome(v.name)}
+        <div className={`welcome ${openTabs.final ? "final" : ""}`} role="status">
+          {openTabs.final ? t.welcomeFinal(v.name) : returning ? t.welcomeBack(v.name) : t.welcome(v.name)}
         </div>
       )}
 
-      <ol className={`steps ${finalOpen ? "five" : ""}`} role="tablist">
-        {steps.map(([label, short], i) => {
-          const st = stateOf(i);
-          const locked = i > 0 && (!started || !invited);
-          const sec = SECTION_OF_STEP[i];
-          const note = st === "final" ? t.note.new
-            : st === "done" && sec ? t.note.done
-            : st === "draft" ? (submitted[sec] ? t.note.editing : t.note.draft)
-            : sec ? t.note.todo : "";
-          return (
-            <li key={label} className={`step ${st} ${i === step ? "current" : ""} ${locked ? "locked" : ""}`}>
-              <button type="button" role="tab" aria-selected={i === step} disabled={locked} onClick={() => go(i)}>
-                <span className="num">{st === "final" ? "★" : st === "done" ? "✓" : st === "draft" ? "✎" : i + 1}</span>
-                <span className="lbl">
-                  <span className="lbl-long">{label}</span><span className="lbl-short">{short}</span>
-                  {note && <span className={`state-note ${st}`}>{note}</span>}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <div className="progress" aria-hidden><span style={{ width: `${(step / (steps.length - 1)) * 100}%` }} /></div>
-
-      {justSaved && (
-        <div className="saved" role="status">
-          <b>{justSaved === "profile" ? t.savedProfile : t.savedTalk}</b>
-          {justSaved === "profile" && !submitted.talk ? t.savedProfileMore : t.savedMore}
-        </div>
-      )}
-
-      <div className="panel" role="tabpanel">
-        {step === 0 && (
-          <>
-            <h2>{t.guideTitle}</h2>
-            <p className="muted">{t.guideSub}</p>
-
+      {/* 연사 안내: 일정 + 세션 정보 (처음 들어오면 펼쳐져 있어요) */}
+      {invited && (
+        <details className="guide-panel" open={!returning}>
+          <summary>{t.guideToggle}</summary>
+          <div className="guide-body">
             <h3 className="sub">{deadlines ? t.myScheduleTitle(v.name) : t.scheduleTitle}</h3>
             {deadlines && <p className="hint sched-note">{t.myScheduleNote}</p>}
             <ol className="timeline">
-              {t.timeline.map((x) => {
+              {t.timeline.filter((x) => !TIMELINE_TAB[x.key] || showTab(TIMELINE_TAB[x.key])).map((x) => {
                 const due = deadlines?.[x.key] ? new Date(deadlines[x.key] + "T00:00:00") : null;
-                const done = (x.key === "register" && submitted.profile && submitted.talk) || (x.key === "slides" && finalOpen);
-                const days = due ? Math.ceil((due - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000) : null;
+                const k = TIMELINE_TAB[x.key];
+                const done = k && submitted[k] && !dirty[k];
+                const days = due ? Math.ceil((due - today0) / 86400000) : null;
                 const cls = done ? "done" : days == null ? "" : days < 0 ? "over" : days <= 7 ? "soon" : "later";
                 return (
-                  <li key={x.title} className={due ? `has-due ${cls}` : ""}>
+                  <li key={x.key} className={due ? `has-due ${cls}` : ""}>
                     <span className="t-date">{due ? t.fmtDay(due) : x.date}</span>
                     <div>
                       <b>{x.title}</b>
@@ -348,20 +389,43 @@ export default function SpeakerWizard({ lang = "ko" }) {
                 );
               })}
             </ol>
-
             {sessionInfo && <SessionCard t={t} info={sessionInfo} name={v.name} />}
+          </div>
+        </details>
+      )}
 
-            {invited && <label className="check-row confirm">
-              <input id="s-guideRead" type="checkbox" name="guideRead" checked={v.guideRead} onChange={onInput} />
-              <span>{t.guideRead}</span>
-            </label>}
-            {err("guideRead")}
-          </>
-        )}
+      <div className="tab-head">
+        <ol className="steps" role="tablist" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+          {tabs.map((k, i) => {
+            const st = stateOf(k);
+            const [long, short] = label(k);
+            const note = st === "final" ? t.note.new : st === "done" ? t.note.done : st === "draft" ? (submitted[k] ? t.note.editing : t.note.draft) : t.note.todo;
+            return (
+              <li key={k} className={`step ${st} ${k === tab ? "current" : ""} ${!invited ? "locked" : ""}`}>
+                <button type="button" role="tab" aria-selected={k === tab} disabled={!invited} onClick={() => go(k)}>
+                  <span className="num">{st === "final" ? "★" : st === "done" ? "✓" : st === "draft" ? "✎" : i + 1}</span>
+                  <span className="lbl">
+                    <span className="lbl-long">{long}</span><span className="lbl-short">{short}</span>
+                    <span className={`state-note ${st}`}>{note}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        {invited && <p className={`progress-text ${allDone ? "done" : ""}`}>{t.progress(doneCount, formTabs.length)}</p>}
+      </div>
 
-        {step === 1 && (
+      {justSaved ? (
+        <div className="saved" role="status"><b>{t.savedSec(t.secName[justSaved])}</b>{allDone ? "" : t.savedNext}</div>
+      ) : allDone && invited && tab !== "final" ? (
+        <div className="saved" role="status"><b>{t.allDoneBanner}</b></div>
+      ) : null}
+
+      <div className="panel" role="tabpanel">
+        {tab === "profile" && (
           <>
-            <h2>{t.profileTitle}</h2>
+            <div className="panel-head"><h2>{t.profileTitle}</h2><Badge t={t} at={submitted.profile} dirty={dirty.profile} /></div>
             <p className="muted">{t.profileSub}</p>
             <div className="two-col">
               {t.fields.map((f) => (
@@ -382,7 +446,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
                 <div className="thumb">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
                 <div>
                   <input id="s-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhoto} aria-invalid={!!errors.photo} />
-                  <p className="hint">{t.photoHint}</p>
+                  <p className="hint">{v.photo && !(v.photo instanceof File) ? `${v.photo.name} · ` : ""}{t.photoHint}</p>
                 </div>
               </div>
               {err("photo")}
@@ -410,9 +474,72 @@ export default function SpeakerWizard({ lang = "ko" }) {
           </>
         )}
 
-        {step === 2 && (
+        {tab === "travel" && (
           <>
-            <h2>{t.talkTitle}</h2>
+            <div className="panel-head"><h2>{T.title}</h2><Badge t={t} at={submitted.travel} dirty={dirty.travel} /></div>
+            <p className="muted">{T.sub}</p>
+
+            {radios("flight", `✈ ${T.flight}`, T.flightOpts)}
+            {v.flight && v.flight !== "none" && (
+              <div className="two-col">
+                {textField("from", T.from, T.fromPh)}
+                {textField("passport", T.passport, T.passportPh, lang === "ko")}
+                {textField("arrive", T.arrive, "", false, "date")}
+                {textField("depart", T.depart, "", false, "date")}
+                {v.flight === "self" && <div className="full">{textField("flightNo", T.flightNo, T.flightNoPh, true)}</div>}
+              </div>
+            )}
+
+            {radios("hotel", `🏨 ${T.hotel}`, T.hotelOpts)}
+            {v.hotel === "need" && (
+              <div className="two-col three">
+                {textField("checkin", T.checkin, "", false, "date")}
+                {textField("checkout", T.checkout, "", false, "date")}
+                <div className="field">
+                  <label htmlFor="s-room">{T.room}</label>
+                  <select id="s-room" name="room" value={v.room} onChange={onInput}>
+                    <option value="">-</option>
+                    {T.roomOpts.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {textField("diet", T.diet, T.dietPh, true)}
+            <div className="field">
+              <label htmlFor="s-travelNote">{T.note}<span className="opt">{t.optional}</span></label>
+              <textarea id="s-travelNote" name="travelNote" rows={2} value={v.travelNote} onChange={onInput} maxLength={400} placeholder={T.notePh} />
+            </div>
+          </>
+        )}
+
+        {tab === "fee" && (
+          <>
+            <div className="panel-head"><h2>{P.title}</h2><Badge t={t} at={submitted.fee} dirty={dirty.fee} /></div>
+            <p className="muted">{P.sub}</p>
+            <p className="notice">{P.notice}</p>
+            <div className="two-col">
+              {textField("bank", P.bank, P.bankPh)}
+              {lang === "en" && textField("swift", P.swift, P.swiftPh)}
+              {textField("account", P.account, P.accountPh)}
+              {textField("holder", P.holder, P.holderPh)}
+              {lang === "en" && <div className="full">{textField("bankAddr", P.bankAddr, P.bankAddrPh, true)}</div>}
+            </div>
+            <div className="two-col">
+              {upload("idCopy", P.idCopy)}
+              {upload("bankCopy", P.bankCopy, lang === "ko")}
+            </div>
+            <label className="check-row confirm">
+              <input id="s-feeConsent" type="checkbox" name="feeConsent" checked={v.feeConsent} onChange={onInput} />
+              <span>{P.consent}</span>
+            </label>
+            {err("feeConsent")}
+          </>
+        )}
+
+        {tab === "talk" && (
+          <>
+            <div className="panel-head"><h2>{t.talkTitle}</h2><Badge t={t} at={submitted.talk} dirty={dirty.talk} /></div>
             <p className="muted">{t.talkSub}</p>
 
             {sessionInfo && (
@@ -448,7 +575,6 @@ export default function SpeakerWizard({ lang = "ko" }) {
                   <span>{t.materialPick}<br /><span className="hint">{t.materialHint}</span></span>
                 )}
               </label>
-              {err("material")}
             </div>
 
             <fieldset className="field">
@@ -467,54 +593,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
           </>
         )}
 
-        {step === 3 && (
-          <>
-            <h2>{t.statusTitle}</h2>
-            {submitted.profile && submitted.talk && !dirty.profile && !dirty.talk
-              ? <p className="all-done">{t.allDone}</p>
-              : <p className="muted">{t.statusSub}</p>}
-
-            <div className="review">
-              <div className="review-head">
-                <h3>{t.profileTitle} <Badge t={t} at={submitted.profile} dirty={dirty.profile} /></h3>
-                <button type="button" className="link" onClick={() => go(1)}>{submitted.profile ? t.edit : t.write}</button>
-              </div>
-              {submitted.profile || dirty.profile ? (
-                <>
-                  <div className="review-profile">
-                    <div className="thumb small">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
-                    <dl>
-                      <dt>{t.rv.name}</dt><dd>{v.name}{v.nameEn && ` (${v.nameEn})`}</dd>
-                      <dt>{t.rv.org}</dt><dd>{v.organization} · {v.position}</dd>
-                      <dt>{t.rv.email}</dt><dd>{v.email}</dd>
-                      <dt>{t.rv.phone}</dt><dd>{v.phone}</dd>
-                    </dl>
-                  </div>
-                  {v.bio && <p className="review-bio">{v.bio}</p>}
-                </>
-              ) : <p className="empty">{t.empty}</p>}
-            </div>
-
-            <div className="review">
-              <div className="review-head">
-                <h3>{t.talkTitle} <Badge t={t} at={submitted.talk} dirty={dirty.talk} /></h3>
-                <button type="button" className="link" onClick={() => go(2)}>{submitted.talk ? t.edit : t.write}</button>
-              </div>
-              {submitted.talk || dirty.talk ? (
-                <dl>
-                  <dt>{t.rv.session}</dt><dd>{v.session || "-"}</dd>
-                  <dt>{t.rv.title}</dt><dd>{v.title || "-"}</dd>
-                  <dt>{t.rv.summary}</dt><dd className="pre">{v.summary || "-"}</dd>
-                  <dt>{t.rv.material}</dt><dd>{v.material ? v.material.name : t.rv.later}</dd>
-                  <dt>{t.rv.recording}</dt><dd>{v.recording === "yes" ? t.yes : t.no}</dd>
-                  {v.request && <><dt>{t.rv.request}</dt><dd className="pre">{v.request}</dd></>}
-                </dl>
-              ) : <p className="empty">{t.empty}</p>}
-            </div>
-          </>
-        )}
-
-        {step === 4 && finalOpen && (
+        {tab === "final" && (
           <>
             <div className="fi-head">
               <div>
@@ -528,7 +607,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
               <div className="fi-hero-main">
                 <p className="fi-label">{F.myTalk(v.name)}</p>
                 <p className="fi-time">{sessionInfo?.when}</p>
-                <p className="fi-title">{v.title}</p>
+                <p className="fi-title">{v.title || sessionInfo?.agenda}</p>
                 <div className="fi-chips"><span>{sessionInfo?.forum}</span></div>
               </div>
               <div className="fi-hero-side">
@@ -559,7 +638,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
             <div className="fi-card">
               <h3>{F.todo}</h3>
               <ul className="todo">
-                {F.todos.map(([st, what, when]) => (
+                {F.todos.filter(([, what]) => (lang === "en" || !/항공|Flight/.test(what)) && (feeEligible || !/연사료|Honorarium/.test(what))).map(([st, what, when]) => (
                   <li key={what} className={st}><span>{st === "ok" ? "✓" : st === "due" ? "!" : "○"}</span>{what}<em>{when}</em></li>
                 ))}
               </ul>
@@ -576,20 +655,20 @@ export default function SpeakerWizard({ lang = "ko" }) {
 
       {serverMessage && <p className="banner server-msg" role="alert">{serverMessage}</p>}
 
-      <div className="wizard-nav">
-        {step > 0 ? <button type="button" className="btn ghost" onClick={() => go(step - 1)}>{t.prev}</button> : <span />}
-        {step === 0 && invited && <button type="button" className="btn primary" onClick={start}>{started ? t.next : t.start}</button>}
-        {(step === 1 || step === 2) && (
-          justSaved === SECTION_OF_STEP[step] ? (
-            <button type="button" className="btn primary" onClick={() => go(step + 1)}>{step === 1 ? t.goTalk : t.goStatus}</button>
-          ) : (
-            <button type="button" className="btn primary" onClick={saveSection} disabled={sending}>
-              {sending ? t.sending : submitted[SECTION_OF_STEP[step]] ? `${step === 1 ? t.submitProfile : t.submitTalk} · ${t.resubmit}` : step === 1 ? t.submitProfile : t.submitTalk}
-            </button>
-          )
-        )}
-        {step === 3 && finalOpen && <button type="button" className="btn primary" onClick={() => go(4)}>{F.title}</button>}
-      </div>
+      {invited && (
+        <div className="wizard-nav">
+          {idx > 0 ? <button type="button" className="btn ghost" onClick={() => go(tabs[idx - 1])}>{t.prev}</button> : <span />}
+          {tab !== "final" && (
+            justSaved === tab ? (
+              nextTab ? <button type="button" className="btn primary" onClick={() => go(nextTab)}>{t.nextTab} · {label(nextTab)[0]}</button> : <span />
+            ) : (
+              <button type="button" className="btn primary" onClick={saveSection} disabled={sending}>
+                {sending ? t.sending : `${t.submitSec(t.secName[tab])}${submitted[tab] ? ` · ${t.resubmit}` : ""}`}
+              </button>
+            )
+          )}
+        </div>
+      )}
     </section>
   );
 }
