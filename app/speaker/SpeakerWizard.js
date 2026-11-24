@@ -1,71 +1,50 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SPEAKER } from "@/lib/event";
+import { TEXT, DEMO_SPEAKER } from "@/lib/speakerI18n";
 
-const STEPS = [
-  { key: "guide", label: "연사 안내", short: "안내" },
-  { key: "profile", label: "기본 정보", short: "기본정보" },
-  { key: "talk", label: "발표 정보", short: "발표정보" },
-  { key: "status", label: "제출 현황", short: "현황" },
-];
 const SECTION_OF_STEP = { 1: "profile", 2: "talk" };
 const PROFILE_KEYS = ["name", "nameEn", "email", "phone", "organization", "position", "bio", "photo", "consentPrivacy"];
 const TALK_KEYS = ["session", "title", "summary", "material", "rehearsal", "recording", "request"];
 
-// 디자인 미리보기용
-//  ?demo=link   : 개인 링크로 처음 들어온 연사 (명단의 이름·이메일이 채워져 있음)
-//  ?demo=return : 기본정보만 제출하고 다시 들어온 연사
-const DEMO_RETURN = {
-  name: "김연사", nameEn: "Yeonsa Kim", email: "speaker@example.com", phone: "010-1234-5678",
-  organization: "○○제약", position: "품질보증팀 / 팀장", photo: { name: "profile.jpg" },
-  bio: "현) ○○제약 품질보증팀 팀장\n전) ○○바이오 QA 매니저\nICH Q9(R1) 실무 적용 자문", consentPrivacy: true,
-};
+// 디자인 미리보기 (?demo=…, 언어는 ?lang=en)
+//  link   : 개인 링크로 처음 들어온 연사
+//  return : 기본정보만 제출하고 다시 들어온 연사
+//  final  : 모두 제출했고 "최종 안내"가 열린 연사
 
 function parseAt(s) {
   const m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
 }
 
-function fmt(d) {
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9+\-\s()]{8,20}$/;
 
-const PROFILE_FIELDS = [
-  { name: "name", label: "이름", placeholder: "홍길동", autoComplete: "name" },
-  { name: "nameEn", label: "영문 이름", placeholder: "Gildong Hong", optional: true },
-  { name: "email", label: "이메일", type: "email", placeholder: "name@company.com", autoComplete: "email" },
-  { name: "phone", label: "연락처", type: "tel", placeholder: "010-1234-5678", autoComplete: "tel" },
-  { name: "organization", label: "소속 (회사·기관)", placeholder: "○○제약", autoComplete: "organization" },
-  { name: "position", label: "부서·직책", placeholder: "품질보증팀 / 팀장", autoComplete: "organization-title" },
-];
-
-function validate(step, v) {
+function validate(step, v, t) {
   const e = {};
-  if (step === 0 && !v.guideRead) e.guideRead = "안내 내용을 확인했다고 체크해 주세요.";
+  const E = t.err;
+  if (step === 0 && !v.guideRead) e.guideRead = E.guideRead;
   if (step === 1) {
-    if (!v.name.trim()) e.name = "이름을 입력해 주세요.";
-    if (!EMAIL_RE.test(v.email.trim())) e.email = "올바른 이메일 주소를 입력해 주세요.";
-    if (!PHONE_RE.test(v.phone.trim())) e.phone = "연락처를 확인해 주세요. (예: 010-1234-5678)";
-    if (!v.organization.trim()) e.organization = "소속을 입력해 주세요.";
-    if (!v.position.trim()) e.position = "부서·직책을 입력해 주세요.";
-    if (!v.photo) e.photo = "프로필 사진을 첨부해 주세요.";
-    if (v.bio.trim().length < 20) e.bio = "약력을 20자 이상 적어 주세요.";
-    if (!v.consentPrivacy) e.consentPrivacy = "개인정보 수집·이용에 동의해 주세요.";
+    if (!v.name.trim()) e.name = E.name;
+    if (!EMAIL_RE.test(v.email.trim())) e.email = E.email;
+    if (!PHONE_RE.test(v.phone.trim())) e.phone = E.phone;
+    if (!v.organization.trim()) e.organization = E.organization;
+    if (!v.position.trim()) e.position = E.position;
+    if (!v.photo) e.photo = E.photo;
+    if (v.bio.trim().length < 20) e.bio = E.bio;
+    if (!v.consentPrivacy) e.consentPrivacy = E.consentPrivacy;
   }
   if (step === 2) {
-    if (!v.session) e.session = "발표 세션을 골라 주세요.";
-    if (!v.title.trim()) e.title = "발표 제목을 입력해 주세요.";
-    if (v.summary.trim().length < 20) e.summary = "발표 요약을 20자 이상 적어 주세요.";
-    if (!v.rehearsal.length) e.rehearsal = "가능한 리허설 시간을 하나 이상 골라 주세요.";
+    if (!v.session) e.session = E.session;
+    if (!v.title.trim()) e.title = E.title;
+    if (v.summary.trim().length < 20) e.summary = E.summary;
+    if (!v.rehearsal.length) e.rehearsal = E.rehearsal;
   }
   return e;
 }
 
-export default function SpeakerWizard() {
+export default function SpeakerWizard({ lang = "ko" }) {
+  const t = TEXT[lang];
   const [step, setStep] = useState(0);
   const [started, setStarted] = useState(false);
   const [errors, setErrors] = useState({});
@@ -73,9 +52,10 @@ export default function SpeakerWizard() {
   const [preview, setPreview] = useState(null);
   const [submitted, setSubmitted] = useState({ profile: null, talk: null }); // 제출 시각
   const [dirty, setDirty] = useState({ profile: false, talk: false }); // 제출 뒤 고친 내용이 있는지
-  const [justSaved, setJustSaved] = useState(null); // 방금 저장한 섹션
+  const [justSaved, setJustSaved] = useState(null);
   const [returning, setReturning] = useState(false);
   const [invited, setInvited] = useState(false); // 개인 링크로 들어왔는지
+  const [finalOpen, setFinalOpen] = useState(false); // 담당자가 최종 안내를 공개했는지
   const [token, setToken] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -90,46 +70,51 @@ export default function SpeakerWizard() {
     session: "", title: "", summary: "", material: null, rehearsal: [], recording: "yes", request: "",
   });
 
-  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+  useEffect(() => () => preview && preview.startsWith("blob:") && URL.revokeObjectURL(preview), [preview]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get("demo");
-    const t = params.get("t");
-    if (t) { loadSpeaker(t); return; }
-    if (demo === "link") {
-      setDemoMode(true);
-      setV((s) => ({ ...s, name: DEMO_RETURN.name, email: DEMO_RETURN.email }));
-      setInvited(true);
-    }
-    if (demo === "return") {
-      setDemoMode(true);
-      setInvited(true);
-      setV((s) => ({ ...s, ...DEMO_RETURN, guideRead: true }));
+    const tk = params.get("t");
+    if (tk) { loadSpeaker(tk); return; }
+    if (!demo) return;
+    const d = DEMO_SPEAKER[lang];
+    setDemoMode(true);
+    setInvited(true);
+    if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
+    if (demo === "return" || demo === "final") {
+      setV((s) => ({ ...s, ...d, photo: { name: "profile.jpg" }, consentPrivacy: true, guideRead: true }));
       setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: null });
       setStarted(true);
       setReturning(true);
       setStep(2);
     }
+    if (demo === "final") {
+      setV((s) => ({ ...s, session: t.sessions[1], title: t.talkNamePh, summary: lang === "en" ? "Key changes in ICH Q9(R1) and how our team ran risk assessments on the shop floor, with lessons learned." : "개정된 Q9(R1)의 주요 변경점과 현장에서 위험평가를 운영한 사례를 공유합니다.", rehearsal: [t.rehearsalOptions[0]], material: { name: "slides.pptx" } }));
+      setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: new Date(2026, 10, 26, 10, 5) });
+      setFinalOpen(true);
+      setStep(4);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 개인 링크(?t=…)로 들어오면 시트에 저장된 내용을 불러옵니다.
-  async function loadSpeaker(t) {
+  async function loadSpeaker(tk) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/speaker?t=${encodeURIComponent(t)}`, { cache: "no-store" });
+      const res = await fetch(`/api/speaker?t=${encodeURIComponent(tk)}`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
-      if (!data.ok) { setLinkError(data.message || "링크를 확인하지 못했어요."); return; }
+      if (!data.ok) { setLinkError(data.message || t.linkErrorTitle); return; }
       const sp = data.speaker;
-      setToken(t);
+      setToken(tk);
       setInvited(true);
       setV((s) => ({
         ...s,
         name: sp.name, email: sp.email, nameEn: sp.nameEn, phone: sp.phone, organization: sp.organization,
         position: sp.position, bio: sp.bio, consentPrivacy: !!sp.consent,
-        photo: sp.photoUrl ? { name: "등록된 사진", url: sp.photoUrl } : null,
+        photo: sp.photoUrl ? { name: "photo", url: sp.photoUrl } : null,
         session: sp.session, title: sp.title, summary: sp.summary,
-        material: sp.materialUrl ? { name: "등록된 발표자료", url: sp.materialUrl } : null,
+        material: sp.materialUrl ? { name: "slides", url: sp.materialUrl } : null,
         rehearsal: sp.rehearsal ? sp.rehearsal.split(", ").filter(Boolean) : [],
         recording: sp.recording === "동의하지 않음" ? "no" : "yes", request: sp.request,
       }));
@@ -143,7 +128,7 @@ export default function SpeakerWizard() {
         setStep(!sub.profile ? 1 : !sub.talk ? 2 : 3);
       }
     } catch {
-      setLinkError("네트워크 연결을 확인하고 새로고침해 주세요.");
+      setLinkError(t.linkErrorTitle);
     } finally {
       setLoading(false);
     }
@@ -165,7 +150,7 @@ export default function SpeakerWizard() {
   }
 
   function check() {
-    const e = validate(step, v);
+    const e = validate(step, v, t);
     setErrors(e);
     if (Object.keys(e).length) {
       document.getElementById(`s-${Object.keys(e)[0]}`)?.focus();
@@ -212,18 +197,18 @@ export default function SpeakerWizard() {
     }
     try {
       const res = await fetch("/api/speaker", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({ ok: false, message: "서버 응답을 읽지 못했어요." }));
+      const data = await res.json().catch(() => ({ ok: false, message: "Server error" }));
       if (!data.ok) {
         setErrors(data.errors || {});
-        setServerMessage(data.message || "저장하지 못했어요.");
+        setServerMessage(data.message || "Error");
         return;
       }
       const sp = data.speaker;
-      if (sec === "profile" && sp.photoUrl) setV((s) => ({ ...s, photo: s.photo instanceof File ? s.photo : { name: "등록된 사진", url: sp.photoUrl } }));
-      if (sec === "talk" && sp.materialUrl) setV((s) => ({ ...s, material: { name: s.material?.name || "등록된 발표자료", url: sp.materialUrl } }));
+      if (sec === "profile" && sp.photoUrl) setV((s) => ({ ...s, photo: s.photo instanceof File ? s.photo : { name: "photo", url: sp.photoUrl } }));
+      if (sec === "talk" && sp.materialUrl) setV((s) => ({ ...s, material: { name: s.material?.name || "slides", url: sp.materialUrl } }));
       markSaved(sec, parseAt(sec === "profile" ? sp.profileAt : sp.talkAt) || new Date());
     } catch {
-      setServerMessage("네트워크 연결을 확인하고 다시 시도해 주세요.");
+      setServerMessage(lang === "en" ? "Please check your connection and try again." : "네트워크 연결을 확인하고 다시 시도해 주세요.");
     } finally {
       setSending(false);
     }
@@ -231,7 +216,8 @@ export default function SpeakerWizard() {
 
   function stateOf(i) {
     if (i === 0) return started ? "done" : step === 0 ? "current" : "todo";
-    if (i === 3) return "todo";
+    if (i === 3) return submitted.profile && submitted.talk && !dirty.profile && !dirty.talk ? "done" : "todo";
+    if (i === 4) return "final";
     const sec = SECTION_OF_STEP[i];
     if (submitted[sec] && !dirty[sec]) return "done";
     if (dirty[sec]) return "draft";
@@ -252,11 +238,11 @@ export default function SpeakerWizard() {
     return (
       <section className="card wizard" ref={topRef}>
         <div className="panel center">
-          {loading ? <p className="muted">연사 정보를 불러오는 중이에요…</p> : (
+          {loading ? <p className="muted">{t.loading}</p> : (
             <>
-              <h2>링크를 확인하지 못했어요</h2>
+              <h2>{t.linkErrorTitle}</h2>
               <p className="muted">{linkError}</p>
-              <p><a className="btn ghost" href="/speaker">개인 링크 다시 받기</a></p>
+              <p><a className="btn ghost" href="/speaker">{t.resumeBtn}</a></p>
             </>
           )}
         </div>
@@ -265,17 +251,19 @@ export default function SpeakerWizard() {
   }
 
   const err = (k) => errors[k] && <p className="error" id={`e-${k}`}>{errors[k]}</p>;
+  const steps = t.steps.slice(0, finalOpen ? 5 : 4);
+  const F = t.final;
 
   return (
     <section className="card wizard" ref={topRef}>
-      {demoMode && <p className="preview-badge">디자인 미리보기 · 아직 실제로 저장되지 않아요</p>}
+      {demoMode && <p className="preview-badge">{t.previewBadge}</p>}
 
       {!invited && (
         <div className="resume">
           {!resendOpen ? (
-            <p>등록은 안내 메일로 받으신 <b>개인 링크</b>로 들어와서 해 주세요. 링크를 못 찾으시면 <button type="button" className="link" onClick={() => setResendOpen(true)}>개인 링크 다시 받기</button></p>
+            <p>{t.resumeIntro(<button type="button" className="link" onClick={() => setResendOpen(true)}>{t.resumeBtn}</button>)}</p>
           ) : resendSent ? (
-            <p role="status">연사 명단에 있는 주소라면 개인 링크를 다시 보냈어요. 메일함을 확인해 주세요.</p>
+            <p role="status">{t.resumeSent}</p>
           ) : (
             <form className="resume-form" onSubmit={async (e) => {
               e.preventDefault();
@@ -283,39 +271,37 @@ export default function SpeakerWizard() {
               await fetch("/api/speaker/resend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }).catch(() => {});
               setResendSent(true);
             }}>
-              <label htmlFor="s-resendEmail">등록 때 쓴 이메일</label>
+              <label htmlFor="s-resendEmail">{t.resumeLabel}</label>
               <div>
                 <input id="s-resendEmail" name="resendEmail" type="email" placeholder="name@company.com" required />
-                <button type="submit" className="btn ghost">링크 받기</button>
+                <button type="submit" className="btn ghost">{t.resumeSubmit}</button>
               </div>
             </form>
           )}
         </div>
       )}
 
-      {returning && (
-        <div className="welcome" role="status">
-          <b>{v.name}님, 다시 오셨네요.</b> 지난번에 제출한 내용을 불러왔어요. 남은 단계만 이어서 작성해 주세요.
-        </div>
-      )}
-      {invited && !returning && (
-        <div className="welcome" role="status">
-          <b>{v.name}님, 안녕하세요.</b> 안내를 확인하신 뒤 기본정보와 발표정보를 단계별로 제출해 주세요. 나눠서 제출해도 이 링크로 다시 들어오면 이어서 쓸 수 있어요.
+      {invited && (
+        <div className={`welcome ${finalOpen ? "final" : ""}`} role="status">
+          {finalOpen ? t.welcomeFinal(v.name) : returning ? t.welcomeBack(v.name) : t.welcome(v.name)}
         </div>
       )}
 
-      <ol className="steps" role="tablist" aria-label="등록 단계">
-        {STEPS.map((s, i) => {
+      <ol className={`steps ${finalOpen ? "five" : ""}`} role="tablist">
+        {steps.map(([label, short], i) => {
           const st = stateOf(i);
           const locked = i > 0 && (!started || !invited);
           const sec = SECTION_OF_STEP[i];
-          const note = st === "done" && sec ? "제출 완료" : st === "draft" ? (submitted[sec] ? "수정 중" : "작성 중") : i > 0 && i < 3 ? "미제출" : "";
+          const note = st === "final" ? t.note.new
+            : st === "done" && sec ? t.note.done
+            : st === "draft" ? (submitted[sec] ? t.note.editing : t.note.draft)
+            : sec ? t.note.todo : "";
           return (
-            <li key={s.key} className={`step ${st} ${i === step ? "current" : ""} ${locked ? "locked" : ""}`}>
+            <li key={label} className={`step ${st} ${i === step ? "current" : ""} ${locked ? "locked" : ""}`}>
               <button type="button" role="tab" aria-selected={i === step} disabled={locked} onClick={() => go(i)}>
-                <span className="num">{st === "done" ? "✓" : st === "draft" ? "✎" : i + 1}</span>
+                <span className="num">{st === "final" ? "★" : st === "done" ? "✓" : st === "draft" ? "✎" : i + 1}</span>
                 <span className="lbl">
-                  <span className="lbl-long">{s.label}</span><span className="lbl-short">{s.short}</span>
+                  <span className="lbl-long">{label}</span><span className="lbl-short">{short}</span>
                   {note && <span className={`state-note ${st}`}>{note}</span>}
                 </span>
               </button>
@@ -323,43 +309,41 @@ export default function SpeakerWizard() {
           );
         })}
       </ol>
-      <div className="progress" aria-hidden><span style={{ width: `${(step / (STEPS.length - 1)) * 100}%` }} /></div>
+      <div className="progress" aria-hidden><span style={{ width: `${(step / (steps.length - 1)) * 100}%` }} /></div>
 
       {justSaved && (
         <div className="saved" role="status">
-          <b>✓ {justSaved === "profile" ? "기본정보" : "발표정보"}가 제출되었어요.</b>
-          {justSaved === "profile" && !submitted.talk
-            ? <> 발표정보는 지금 이어서 쓰셔도 되고, 나중에 같은 개인 링크로 들어와서 쓰셔도 돼요.</>
-            : <> 언제든 다시 들어와서 고칠 수 있어요.</>}
+          <b>{justSaved === "profile" ? t.savedProfile : t.savedTalk}</b>
+          {justSaved === "profile" && !submitted.talk ? t.savedProfileMore : t.savedMore}
         </div>
       )}
 
       <div className="panel" role="tabpanel">
         {step === 0 && (
           <>
-            <h2>연사 안내</h2>
-            <p className="muted">등록 전에 일정과 진행 방식을 확인해 주세요.</p>
+            <h2>{t.guideTitle}</h2>
+            <p className="muted">{t.guideSub}</p>
 
-            <h3 className="sub">주요 일정</h3>
+            <h3 className="sub">{t.scheduleTitle}</h3>
             <ol className="timeline">
-              {SPEAKER.timeline.map((t) => (
-                <li key={t.title}>
-                  <span className="t-date">{t.date}</span>
-                  <div><b>{t.title}</b><p>{t.desc}</p></div>
+              {t.timeline.map((x) => (
+                <li key={x.title}>
+                  <span className="t-date">{x.date}</span>
+                  <div><b>{x.title}</b><p>{x.desc}</p></div>
                 </li>
               ))}
             </ol>
 
-            <h3 className="sub">진행 안내</h3>
+            <h3 className="sub">{t.howTitle}</h3>
             <div className="guide-grid">
-              {SPEAKER.guide.map((g) => (
+              {t.guide.map((g) => (
                 <div className="guide-item" key={g.title}><b>{g.title}</b><p>{g.body}</p></div>
               ))}
             </div>
 
             {invited && <label className="check-row confirm">
               <input id="s-guideRead" type="checkbox" name="guideRead" checked={v.guideRead} onChange={onInput} />
-              <span>위 안내를 확인했습니다.</span>
+              <span>{t.guideRead}</span>
             </label>}
             {err("guideRead")}
           </>
@@ -367,51 +351,49 @@ export default function SpeakerWizard() {
 
         {step === 1 && (
           <>
-            <h2>기본 정보</h2>
-            <p className="muted">프로그램 안내와 연사 소개에 쓰입니다.</p>
+            <h2>{t.profileTitle}</h2>
+            <p className="muted">{t.profileSub}</p>
             <div className="two-col">
-              {PROFILE_FIELDS.map((f) => (
-                <div className="field" key={f.name}>
-                  <label htmlFor={`s-${f.name}`}>{f.label}{f.optional && <span className="opt"> (선택)</span>}</label>
+              {t.fields.map((f) => (
+                <div className={`field ${lang === "en" && f.name === "name" ? "full" : ""}`} key={f.name}>
+                  <label htmlFor={`s-${f.name}`}>{f.label}{f.optional && <span className="opt">{t.optional}</span>}</label>
                   <input id={`s-${f.name}`} name={f.name} type={f.type || "text"} placeholder={f.placeholder}
                     autoComplete={f.autoComplete} value={v[f.name]} onChange={onInput} maxLength={100}
                     aria-invalid={!!errors[f.name]} readOnly={invited && f.name === "email"} />
-                  {invited && f.name === "email" && <p className="hint">명단에 등록된 주소예요. 바꾸려면 담당자에게 알려 주세요.</p>}
+                  {invited && f.name === "email" && <p className="hint">{t.emailLocked}</p>}
                   {err(f.name)}
                 </div>
               ))}
             </div>
 
             <div className="field">
-              <label htmlFor="s-photo">프로필 사진</label>
+              <label htmlFor="s-photo">{t.photo}</label>
               <div className="photo">
-                <div className="thumb">{preview ? <img src={preview} alt="프로필 사진 미리보기" /> : <span>사진</span>}</div>
+                <div className="thumb">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
                 <div>
                   <input id="s-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhoto} aria-invalid={!!errors.photo} />
-                  <p className="hint">정면 상반신 사진 권장. JPG·PNG·WEBP, 4MB 이하.</p>
+                  <p className="hint">{t.photoHint}</p>
                 </div>
               </div>
               {err("photo")}
             </div>
 
             <div className="field">
-              <label htmlFor="s-bio">약력</label>
+              <label htmlFor="s-bio">{t.bio}</label>
               <textarea id="s-bio" name="bio" rows={5} value={v.bio} onChange={onInput} maxLength={800}
-                placeholder={"예) 현) ○○제약 품질보증팀 팀장\n전) 식품의약품안전처 ○○과\nICH Q9(R1) 실무 적용 자문"} aria-invalid={!!errors.bio} />
-              <p className="hint">{v.bio.length} / 800자 · 줄마다 한 항목씩 적어 주세요.</p>
+                placeholder={t.bioPh} aria-invalid={!!errors.bio} />
+              <p className="hint">{t.bioHint(v.bio.length)}</p>
               {err("bio")}
             </div>
 
             <div className="consent">
               <p className="consent-text">
-                <b>개인정보 수집·이용 안내</b><br />
-                수집 항목: 이름, 영문 이름, 이메일, 연락처, 소속, 직책, 사진, 약력, 발표 정보<br />
-                이용 목적: 연사 섭외·일정 안내, 교육 프로그램 및 연사 소개 게시<br />
-                보유 기간: 교육 종료 후 1년 (이후 파기)
+                <b>{t.consentTitle}</b><br />
+                {t.consentBody.map((line) => <span key={line}>{line}<br /></span>)}
               </p>
               <label className="check-row">
                 <input id="s-consentPrivacy" type="checkbox" name="consentPrivacy" checked={v.consentPrivacy} onChange={onInput} />
-                <span>위 내용에 동의합니다. (필수)</span>
+                <span>{t.consentAgree}</span>
               </label>
               {err("consentPrivacy")}
             </div>
@@ -420,51 +402,51 @@ export default function SpeakerWizard() {
 
         {step === 2 && (
           <>
-            <h2>발표 정보</h2>
-            <p className="muted">발표 세션과 자료, 리허설 가능 시간을 알려 주세요.</p>
+            <h2>{t.talkTitle}</h2>
+            <p className="muted">{t.talkSub}</p>
 
             <div className="field">
-              <label htmlFor="s-session">발표 세션</label>
+              <label htmlFor="s-session">{t.session}</label>
               <select id="s-session" name="session" value={v.session} onChange={onInput} aria-invalid={!!errors.session}>
-                <option value="">세션을 골라 주세요</option>
-                {SPEAKER.sessions.map((s) => <option key={s} value={s}>{s}</option>)}
+                <option value="">{t.sessionPh}</option>
+                {t.sessions.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               {err("session")}
             </div>
 
             <div className="field">
-              <label htmlFor="s-title">발표 제목</label>
+              <label htmlFor="s-title">{t.talkName}</label>
               <input id="s-title" name="title" type="text" value={v.title} onChange={onInput} maxLength={120}
-                placeholder="ICH Q9(R1) 품질위험관리 실무 적용 사례" aria-invalid={!!errors.title} />
+                placeholder={t.talkNamePh} aria-invalid={!!errors.title} />
               {err("title")}
             </div>
 
             <div className="field">
-              <label htmlFor="s-summary">발표 요약</label>
+              <label htmlFor="s-summary">{t.summary}</label>
               <textarea id="s-summary" name="summary" rows={4} value={v.summary} onChange={onInput} maxLength={600}
-                placeholder="참석자에게 안내될 3~5줄 요약" aria-invalid={!!errors.summary} />
-              <p className="hint">{v.summary.length} / 600자</p>
+                placeholder={t.summaryPh} aria-invalid={!!errors.summary} />
+              <p className="hint">{t.summaryHint(v.summary.length)}</p>
               {err("summary")}
             </div>
 
             <div className="field">
-              <label htmlFor="s-material">발표자료 <span className="opt">(선택 · 초안도 괜찮아요)</span></label>
+              <label htmlFor="s-material">{t.material} <span className="opt">{t.materialOpt}</span></label>
               <label className={`dropzone ${v.material ? "has" : ""}`} htmlFor="s-material">
                 <input id="s-material" type="file" accept=".pdf,.ppt,.pptx"
                   onChange={(e) => set("material", e.target.files?.[0] || null)} />
                 {v.material ? (
-                  <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}눌러서 바꾸기</span></span>
+                  <span><b>{v.material.name}</b><br /><span className="hint">{v.material instanceof File ? `${(v.material.size / 1024 / 1024).toFixed(1)}MB · ` : ""}{t.materialChange}</span></span>
                 ) : (
-                  <span><b>파일 선택</b> 또는 여기로 끌어다 놓기<br /><span className="hint">PDF·PPT·PPTX, 4MB 이하 · 더 큰 파일은 담당자 메일로 · 최종본은 {SPEAKER.materialDeadline}까지</span></span>
+                  <span>{t.materialPick}<br /><span className="hint">{t.materialHint}</span></span>
                 )}
               </label>
               {err("material")}
             </div>
 
             <fieldset className="field">
-              <legend>리허설 가능 시간 <span className="opt">(여러 개 선택 가능)</span></legend>
+              <legend>{t.rehearsal} <span className="opt">{t.rehearsalOpt}</span></legend>
               <div className="chips" id="s-rehearsal" tabIndex={-1}>
-                {SPEAKER.rehearsalOptions.map((o) => (
+                {t.rehearsalOptions.map((o) => (
                   <label key={o} className={`chip ${v.rehearsal.includes(o) ? "on" : ""}`}>
                     <input type="checkbox" checked={v.rehearsal.includes(o)} onChange={() => toggleRehearsal(o)} />
                     {o}
@@ -475,67 +457,127 @@ export default function SpeakerWizard() {
             </fieldset>
 
             <fieldset className="field">
-              <legend>발표 녹화·다시보기 제공</legend>
+              <legend>{t.recording}</legend>
               <div className="radios">
-                <label><input type="radio" name="recording" value="yes" checked={v.recording === "yes"} onChange={onInput} /> 동의</label>
-                <label><input type="radio" name="recording" value="no" checked={v.recording === "no"} onChange={onInput} /> 동의하지 않음</label>
+                <label><input type="radio" name="recording" value="yes" checked={v.recording === "yes"} onChange={onInput} /> {t.yes}</label>
+                <label><input type="radio" name="recording" value="no" checked={v.recording === "no"} onChange={onInput} /> {t.no}</label>
               </div>
             </fieldset>
 
             <div className="field">
-              <label htmlFor="s-request">요청 사항 <span className="opt">(선택)</span></label>
+              <label htmlFor="s-request">{t.request} <span className="opt">{t.optional}</span></label>
               <textarea id="s-request" name="request" rows={2} value={v.request} onChange={onInput} maxLength={400}
-                placeholder="예) 동영상 재생 필요, 공동 발표자 있음 등" />
+                placeholder={t.requestPh} />
             </div>
           </>
         )}
 
         {step === 3 && (
           <>
-            <h2>제출 현황</h2>
-            {submitted.profile && submitted.talk && !dirty.profile && !dirty.talk ? (
-              <p className="all-done">✓ 모든 정보가 제출되었습니다. 감사합니다! 마감 전까지 언제든 고칠 수 있어요.</p>
-            ) : (
-              <p className="muted">단계별로 따로 제출할 수 있어요. 아직 제출하지 않은 단계는 [작성하기]를 눌러 이어서 써 주세요.</p>
-            )}
+            <h2>{t.statusTitle}</h2>
+            {submitted.profile && submitted.talk && !dirty.profile && !dirty.talk
+              ? <p className="all-done">{t.allDone}</p>
+              : <p className="muted">{t.statusSub}</p>}
 
             <div className="review">
               <div className="review-head">
-                <h3>기본 정보 <Badge at={submitted.profile} dirty={dirty.profile} /></h3>
-                <button type="button" className="link" onClick={() => go(1)}>{submitted.profile ? "수정" : "작성하기"}</button>
+                <h3>{t.profileTitle} <Badge t={t} at={submitted.profile} dirty={dirty.profile} /></h3>
+                <button type="button" className="link" onClick={() => go(1)}>{submitted.profile ? t.edit : t.write}</button>
               </div>
               {submitted.profile || dirty.profile ? (
                 <>
                   <div className="review-profile">
-                    <div className="thumb small">{preview ? <img src={preview} alt="" /> : <span>사진</span>}</div>
+                    <div className="thumb small">{preview ? <img src={preview} alt="" /> : <span>{t.photoPh}</span>}</div>
                     <dl>
-                      <dt>이름</dt><dd>{v.name}{v.nameEn && ` (${v.nameEn})`}</dd>
-                      <dt>소속·직책</dt><dd>{v.organization} · {v.position}</dd>
-                      <dt>이메일</dt><dd>{v.email}</dd>
-                      <dt>연락처</dt><dd>{v.phone}</dd>
+                      <dt>{t.rv.name}</dt><dd>{v.name}{v.nameEn && ` (${v.nameEn})`}</dd>
+                      <dt>{t.rv.org}</dt><dd>{v.organization} · {v.position}</dd>
+                      <dt>{t.rv.email}</dt><dd>{v.email}</dd>
+                      <dt>{t.rv.phone}</dt><dd>{v.phone}</dd>
                     </dl>
                   </div>
                   {v.bio && <p className="review-bio">{v.bio}</p>}
                 </>
-              ) : <p className="empty">아직 입력하지 않았어요.</p>}
+              ) : <p className="empty">{t.empty}</p>}
             </div>
 
             <div className="review">
               <div className="review-head">
-                <h3>발표 정보 <Badge at={submitted.talk} dirty={dirty.talk} /></h3>
-                <button type="button" className="link" onClick={() => go(2)}>{submitted.talk ? "수정" : "작성하기"}</button>
+                <h3>{t.talkTitle} <Badge t={t} at={submitted.talk} dirty={dirty.talk} /></h3>
+                <button type="button" className="link" onClick={() => go(2)}>{submitted.talk ? t.edit : t.write}</button>
               </div>
               {submitted.talk || dirty.talk ? (
                 <dl>
-                  <dt>세션</dt><dd>{v.session || "-"}</dd>
-                  <dt>제목</dt><dd>{v.title || "-"}</dd>
-                  <dt>요약</dt><dd className="pre">{v.summary || "-"}</dd>
-                  <dt>자료</dt><dd>{v.material ? v.material.name : "추후 제출"}</dd>
-                  <dt>리허설</dt><dd>{v.rehearsal.join(", ") || "-"}</dd>
-                  <dt>녹화</dt><dd>{v.recording === "yes" ? "동의" : "동의하지 않음"}</dd>
-                  {v.request && <><dt>요청</dt><dd className="pre">{v.request}</dd></>}
+                  <dt>{t.rv.session}</dt><dd>{v.session || "-"}</dd>
+                  <dt>{t.rv.title}</dt><dd>{v.title || "-"}</dd>
+                  <dt>{t.rv.summary}</dt><dd className="pre">{v.summary || "-"}</dd>
+                  <dt>{t.rv.material}</dt><dd>{v.material ? v.material.name : t.rv.later}</dd>
+                  <dt>{t.rv.rehearsal}</dt><dd>{v.rehearsal.join(", ") || "-"}</dd>
+                  <dt>{t.rv.recording}</dt><dd>{v.recording === "yes" ? t.yes : t.no}</dd>
+                  {v.request && <><dt>{t.rv.request}</dt><dd className="pre">{v.request}</dd></>}
                 </dl>
-              ) : <p className="empty">아직 입력하지 않았어요.</p>}
+              ) : <p className="empty">{t.empty}</p>}
+            </div>
+          </>
+        )}
+
+        {step === 4 && finalOpen && (
+          <>
+            <div className="fi-head">
+              <div>
+                <h2>{F.title}</h2>
+                <p className="muted">{F.updated}</p>
+              </div>
+              <span className="badge done big">{F.confirmed}</span>
+            </div>
+
+            <div className="fi-hero">
+              <div className="fi-hero-main">
+                <p className="fi-label">{F.myTalk(v.name)}</p>
+                <p className="fi-time">{F.when}</p>
+                <p className="fi-title">{v.title}</p>
+                <div className="fi-chips">{F.chips.map((c) => <span key={c}>{c}</span>)}</div>
+              </div>
+              <div className="fi-hero-side">
+                <p className="fi-label">{F.arrive}</p>
+                <p className="fi-big">{F.arriveTime}</p>
+                <p className="hint">{F.arriveHint}</p>
+              </div>
+            </div>
+
+            <div className="fi-grid">
+              <div className="fi-card">
+                <h3>{F.access}</h3>
+                <dl className="fi-dl">
+                  <dt>{F.link}</dt><dd><a className="btn primary sm" href="#" onClick={(e) => e.preventDefault()}>{F.zoomBtn}</a></dd>
+                  <dt>{F.meetingId}</dt><dd>812 3456 7890</dd>
+                  <dt>{F.passcode}</dt><dd>ich1215</dd>
+                </dl>
+                <p className="hint">{F.accessHint(v.name)}</p>
+              </div>
+              <div className="fi-card">
+                <h3>{F.rehearsal}</h3>
+                <p className="fi-strong">{F.rehearsalWhen}</p>
+                <p className="hint">{F.rehearsalHint}</p>
+                <h3 className="mt">{F.order}</h3>
+                <ol className="fi-order">
+                  {F.orderRows.map(([time, what, me]) => <li key={time} className={me ? "me" : ""}><span>{time}</span>{what}</li>)}
+                </ol>
+              </div>
+            </div>
+
+            <div className="fi-card">
+              <h3>{F.todo}</h3>
+              <ul className="todo">
+                {F.todos.map(([st, what, when]) => (
+                  <li key={what} className={st}><span>{st === "ok" ? "✓" : st === "due" ? "!" : "○"}</span>{what}<em>{when}</em></li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="fi-note">
+              <p className="fi-label">{F.memo}</p>
+              <p>{F.memoBody}</p>
+              <p className="fi-sign">{F.memoSign}</p>
             </div>
           </>
         )}
@@ -544,24 +586,25 @@ export default function SpeakerWizard() {
       {serverMessage && <p className="banner server-msg" role="alert">{serverMessage}</p>}
 
       <div className="wizard-nav">
-        {step > 0 ? <button type="button" className="btn ghost" onClick={() => go(step - 1)}>이전</button> : <span />}
-        {step === 0 && invited && <button type="button" className="btn primary" onClick={start}>{started ? "다음" : "등록 시작하기"}</button>}
+        {step > 0 ? <button type="button" className="btn ghost" onClick={() => go(step - 1)}>{t.prev}</button> : <span />}
+        {step === 0 && invited && <button type="button" className="btn primary" onClick={start}>{started ? t.next : t.start}</button>}
         {(step === 1 || step === 2) && (
           justSaved === SECTION_OF_STEP[step] ? (
-            <button type="button" className="btn primary" onClick={() => go(step + 1)}>{step === 1 ? "발표정보 이어서 쓰기" : "제출 현황 보기"}</button>
+            <button type="button" className="btn primary" onClick={() => go(step + 1)}>{step === 1 ? t.goTalk : t.goStatus}</button>
           ) : (
             <button type="button" className="btn primary" onClick={saveSection} disabled={sending}>
-              {sending ? "제출 중…" : `${step === 1 ? "기본정보" : "발표정보"} ${submitted[SECTION_OF_STEP[step]] ? "다시 제출" : "제출"}`}
+              {sending ? t.sending : submitted[SECTION_OF_STEP[step]] ? `${step === 1 ? t.submitProfile : t.submitTalk} · ${t.resubmit}` : step === 1 ? t.submitProfile : t.submitTalk}
             </button>
           )
         )}
+        {step === 3 && finalOpen && <button type="button" className="btn primary" onClick={() => go(4)}>{F.title}</button>}
       </div>
     </section>
   );
 }
 
-function Badge({ at, dirty }) {
-  if (dirty) return <span className="badge draft">{at ? "수정 중 · 다시 제출 필요" : "작성 중 · 미제출"}</span>;
-  if (at) return <span className="badge done">제출 완료 · {fmt(at)}</span>;
-  return <span className="badge todo">미제출</span>;
+function Badge({ t, at, dirty }) {
+  if (dirty) return <span className="badge draft">{at ? t.badge.editing : t.badge.draft}</span>;
+  if (at) return <span className="badge done">{t.badge.done} · {t.fmt(at)}</span>;
+  return <span className="badge todo">{t.badge.todo}</span>;
 }
