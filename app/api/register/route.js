@@ -2,7 +2,7 @@ import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { validateFields, validatePhoto } from "@/lib/validate";
 import { appendToSheet } from "@/lib/sheet";
-import { sendConfirmation } from "@/lib/mail";
+import { sendConfirmation, mailEnabled } from "@/lib/mail";
 import { photoViewUrl } from "@/lib/photoLink";
 
 export const runtime = "nodejs";
@@ -82,13 +82,16 @@ export async function POST(request) {
     return json({ ok: false, message: "등록 저장 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요." }, 500);
   }
 
-  // 3) 확인 메일 발송. 실패해도 등록은 이미 저장됐으므로 성공으로 응답합니다.
-  let mailSent = true;
-  try {
-    await sendConfirmation({ ...fields, registrationId });
-  } catch (e) {
-    mailSent = false;
-    console.error("[register] confirmation mail failed:", e);
+  // 3) 확인 메일 발송 (MAIL_ENABLED=false 이면 건너뜀). 실패해도 등록은 이미 저장됐으므로 성공으로 응답합니다.
+  let mailSent = null;
+  if (mailEnabled()) {
+    try {
+      await sendConfirmation({ ...fields, registrationId });
+      mailSent = true;
+    } catch (e) {
+      mailSent = false;
+      console.error("[register] confirmation mail failed:", e);
+    }
   }
 
   return json({ ok: true, registrationId, mailSent });
