@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { validateFields, validatePhoto } from "@/lib/validate";
 import { appendToSheet } from "@/lib/sheet";
 import { sendConfirmation } from "@/lib/mail";
+import { photoViewUrl } from "@/lib/photoLink";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,15 +50,18 @@ export async function POST(request) {
 
   // 1) 사진을 Vercel Blob에 저장
   let photoUrl;
-  if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.NODE_ENV !== "production") {
+  const blobConfigured = process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID;
+  if (!blobConfigured && process.env.NODE_ENV !== "production") {
     photoUrl = "(로컬 테스트: 사진 미저장)";
   } else try {
     const blob = await put(`photos/${registrationId}.${EXT[photo.type]}`, photo, {
-      access: "public",
+      access: process.env.BLOB_ACCESS || "private", // Blob 저장소가 Public이면 BLOB_ACCESS=public
       addRandomSuffix: true,
       contentType: photo.type,
     });
-    photoUrl = blob.url;
+    photoUrl = (process.env.BLOB_ACCESS || "private") === "public"
+      ? blob.url
+      : photoViewUrl(new URL(request.url).origin, blob.pathname);
   } catch (e) {
     console.error("[register] photo upload failed:", e);
     return json({ ok: false, message: "사진 저장 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요." }, 500);
