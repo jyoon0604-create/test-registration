@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SPEAKER } from "@/lib/event";
 import { TEXT } from "@/lib/speakerI18n";
 import SpeakerWizard from "./SpeakerWizard";
 
@@ -19,7 +18,7 @@ export default function SpeakerApp() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = lang === "en" ? "ICH Guideline Training · Speaker Guide" : "ICH 가이드라인 교육 연사 안내·등록";
+    document.title = lang === "en" ? "Global Bio Conference 2027 · Speaker Guide" : "2027년 글로벌 바이오 콘퍼런스 연사 안내·등록";
   }, [lang]);
 
   function switchTo(next) {
@@ -48,15 +47,6 @@ export default function SpeakerApp() {
       </div>
 
       <div className="wrap">
-        {/* 키비주얼(포스터·배너) 영역: lib/event.js의 SPEAKER.banner에 이미지 경로를 넣으면 표시됩니다. */}
-        <figure className={`kv ${SPEAKER.banner ? "has" : ""}`}>
-          {SPEAKER.banner ? (
-            <img src={SPEAKER.banner} alt={t.pageTitle} />
-          ) : (
-            <figcaption><b>{t.kvTitle}</b><span>{t.kvHint}</span></figcaption>
-          )}
-        </figure>
-
         <section className="sp-intro">
           <p className="eyebrow">SPEAKER GUIDE</p>
           <h1>{t.pageTitle}</h1>

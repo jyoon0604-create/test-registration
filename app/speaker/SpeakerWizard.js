@@ -35,10 +35,8 @@ function validate(step, v, t) {
     if (!v.consentPrivacy) e.consentPrivacy = E.consentPrivacy;
   }
   if (step === 2) {
-    if (!v.session) e.session = E.session;
     if (!v.title.trim()) e.title = E.title;
     if (v.summary.trim().length < 20) e.summary = E.summary;
-    if (!v.rehearsal.length) e.rehearsal = E.rehearsal;
   }
   return e;
 }
@@ -56,6 +54,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
   const [returning, setReturning] = useState(false);
   const [invited, setInvited] = useState(false); // 개인 링크로 들어왔는지
   const [finalOpen, setFinalOpen] = useState(false); // 담당자가 최종 안내를 공개했는지
+  const [sessionInfo, setSessionInfo] = useState(null); // 담당자가 연사별로 넣는 세션 정보
   const [token, setToken] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,16 +80,17 @@ export default function SpeakerWizard({ lang = "ko" }) {
     const d = DEMO_SPEAKER[lang];
     setDemoMode(true);
     setInvited(true);
+    setSessionInfo(d.session);
     if (demo === "link") setV((s) => ({ ...s, name: d.name, email: d.email }));
     if (demo === "return" || demo === "final") {
-      setV((s) => ({ ...s, ...d, photo: { name: "profile.jpg" }, consentPrivacy: true, guideRead: true }));
+      setV((s) => ({ ...s, ...d, session: d.session.forum, photo: { name: "profile.jpg" }, consentPrivacy: true, guideRead: true }));
       setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: null });
       setStarted(true);
       setReturning(true);
       setStep(2);
     }
     if (demo === "final") {
-      setV((s) => ({ ...s, session: t.sessions[1], title: t.talkNamePh, summary: lang === "en" ? "Key changes in ICH Q9(R1) and how our team ran risk assessments on the shop floor, with lessons learned." : "개정된 Q9(R1)의 주요 변경점과 현장에서 위험평가를 운영한 사례를 공유합니다.", rehearsal: [t.rehearsalOptions[0]], material: { name: "slides.pptx" } }));
+      setV((s) => ({ ...s, title: d.session.agenda, summary: lang === "en" ? "Progress and outcomes of MFDS NAMs R&D, and our strategy for K-DDT, AI-based evaluation platforms and global regulatory collaboration." : "식약처 NAMs R&D 추진현황과 성과, K-DDT 구축·AI 기반 평가 플랫폼·글로벌 규제기관 협력 등 향후 추진전략을 소개합니다.", material: { name: "slides.pptx" } }));
       setSubmitted({ profile: new Date(2026, 10, 24, 13, 40), talk: new Date(2026, 10, 26, 10, 5) });
       setFinalOpen(true);
       setStep(4);
@@ -334,12 +334,7 @@ export default function SpeakerWizard({ lang = "ko" }) {
               ))}
             </ol>
 
-            <h3 className="sub">{t.howTitle}</h3>
-            <div className="guide-grid">
-              {t.guide.map((g) => (
-                <div className="guide-item" key={g.title}><b>{g.title}</b><p>{g.body}</p></div>
-              ))}
-            </div>
+            {sessionInfo && <SessionCard t={t} info={sessionInfo} name={v.name} />}
 
             {invited && <label className="check-row confirm">
               <input id="s-guideRead" type="checkbox" name="guideRead" checked={v.guideRead} onChange={onInput} />
@@ -405,14 +400,12 @@ export default function SpeakerWizard({ lang = "ko" }) {
             <h2>{t.talkTitle}</h2>
             <p className="muted">{t.talkSub}</p>
 
-            <div className="field">
-              <label htmlFor="s-session">{t.session}</label>
-              <select id="s-session" name="session" value={v.session} onChange={onInput} aria-invalid={!!errors.session}>
-                <option value="">{t.sessionPh}</option>
-                {t.sessions.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              {err("session")}
-            </div>
+            {sessionInfo && (
+              <div className="session-mini">
+                <span>{t.si.forum}</span><b>{sessionInfo.forum}</b>
+                <span>{t.si.when}</span><b>{sessionInfo.when}</b>
+              </div>
+            )}
 
             <div className="field">
               <label htmlFor="s-title">{t.talkName}</label>
@@ -442,19 +435,6 @@ export default function SpeakerWizard({ lang = "ko" }) {
               </label>
               {err("material")}
             </div>
-
-            <fieldset className="field">
-              <legend>{t.rehearsal} <span className="opt">{t.rehearsalOpt}</span></legend>
-              <div className="chips" id="s-rehearsal" tabIndex={-1}>
-                {t.rehearsalOptions.map((o) => (
-                  <label key={o} className={`chip ${v.rehearsal.includes(o) ? "on" : ""}`}>
-                    <input type="checkbox" checked={v.rehearsal.includes(o)} onChange={() => toggleRehearsal(o)} />
-                    {o}
-                  </label>
-                ))}
-              </div>
-              {err("rehearsal")}
-            </fieldset>
 
             <fieldset className="field">
               <legend>{t.recording}</legend>
@@ -511,7 +491,6 @@ export default function SpeakerWizard({ lang = "ko" }) {
                   <dt>{t.rv.title}</dt><dd>{v.title || "-"}</dd>
                   <dt>{t.rv.summary}</dt><dd className="pre">{v.summary || "-"}</dd>
                   <dt>{t.rv.material}</dt><dd>{v.material ? v.material.name : t.rv.later}</dd>
-                  <dt>{t.rv.rehearsal}</dt><dd>{v.rehearsal.join(", ") || "-"}</dd>
                   <dt>{t.rv.recording}</dt><dd>{v.recording === "yes" ? t.yes : t.no}</dd>
                   {v.request && <><dt>{t.rv.request}</dt><dd className="pre">{v.request}</dd></>}
                 </dl>
@@ -533,9 +512,9 @@ export default function SpeakerWizard({ lang = "ko" }) {
             <div className="fi-hero">
               <div className="fi-hero-main">
                 <p className="fi-label">{F.myTalk(v.name)}</p>
-                <p className="fi-time">{F.when}</p>
+                <p className="fi-time">{sessionInfo?.when}</p>
                 <p className="fi-title">{v.title}</p>
-                <div className="fi-chips">{F.chips.map((c) => <span key={c}>{c}</span>)}</div>
+                <div className="fi-chips"><span>{sessionInfo?.forum}</span></div>
               </div>
               <div className="fi-hero-side">
                 <p className="fi-label">{F.arrive}</p>
@@ -546,19 +525,16 @@ export default function SpeakerWizard({ lang = "ko" }) {
 
             <div className="fi-grid">
               <div className="fi-card">
-                <h3>{F.access}</h3>
+                <h3>{F.onsite}</h3>
                 <dl className="fi-dl">
-                  <dt>{F.link}</dt><dd><a className="btn primary sm" href="#" onClick={(e) => e.preventDefault()}>{F.zoomBtn}</a></dd>
-                  <dt>{F.meetingId}</dt><dd>812 3456 7890</dd>
-                  <dt>{F.passcode}</dt><dd>ich1215</dd>
+                  <dt>{F.venue}</dt><dd>{F.venueV}</dd>
+                  <dt>{F.room}</dt><dd>{F.roomV}</dd>
+                  <dt>{F.desk}</dt><dd>{F.deskV}</dd>
                 </dl>
-                <p className="hint">{F.accessHint(v.name)}</p>
+                <p className="hint">{F.onsiteHint}</p>
               </div>
               <div className="fi-card">
-                <h3>{F.rehearsal}</h3>
-                <p className="fi-strong">{F.rehearsalWhen}</p>
-                <p className="hint">{F.rehearsalHint}</p>
-                <h3 className="mt">{F.order}</h3>
+                <h3>{F.order}</h3>
                 <ol className="fi-order">
                   {F.orderRows.map(([time, what, me]) => <li key={time} className={me ? "me" : ""}><span>{time}</span>{what}</li>)}
                 </ol>
@@ -607,4 +583,28 @@ function Badge({ t, at, dirty }) {
   if (dirty) return <span className="badge draft">{at ? t.badge.editing : t.badge.draft}</span>;
   if (at) return <span className="badge done">{t.badge.done} · {t.fmt(at)}</span>;
   return <span className="badge todo">{t.badge.todo}</span>;
+}
+
+// 연사별 세션 정보 (담당자가 시트에 연사마다 넣는 내용)
+function SessionCard({ t, info, name }) {
+  return (
+    <section className="session-card">
+      <div className="session-card-head">
+        <h3>{t.sessionTitle}</h3>
+        <p>{t.sessionSub(name)}</p>
+      </div>
+      <dl className="session-dl">
+        <dt>{t.si.forum}</dt><dd><b>{info.forum}</b></dd>
+        <dt>{t.si.topic}</dt><dd>{info.topic}</dd>
+        <dt>{t.si.when}</dt><dd>{info.when}</dd>
+        <dt>{t.si.agenda}</dt><dd className="agenda">“{info.agenda}”</dd>
+      </dl>
+      {info.include?.length > 0 && (
+        <div className="session-include">
+          <p>{t.si.include}</p>
+          <ul>{info.include.map((x) => <li key={x}>{x}</li>)}</ul>
+        </div>
+      )}
+    </section>
+  );
 }

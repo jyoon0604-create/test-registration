@@ -20,10 +20,10 @@
 // ▼ 실제 사이트 주소 (Vercel 프로젝트의 Domains에 나오는 주소)
 var SITE_URL = 'https://test-registration.vercel.app';
 // ▼ 연사 안내 메일에 표시할 보내는 사람 이름과 행사 정보
-var MAIL_FROM_NAME = 'ICH 교육 담당자';
-var EVENT_TITLE = 'ICH 가이드라인 교육';
-var EVENT_WHEN = '2026년 12월 15일(화) 14:00 ~ 17:00 (온라인)';
-var SPEAKER_DEADLINE = '2026년 12월 4일(금) 18:00';
+var MAIL_FROM_NAME = '글로벌 바이오 콘퍼런스 사무국';
+var EVENT_TITLE = '2027년 글로벌 바이오 콘퍼런스';
+var EVENT_WHEN = '2027년 9월 1일(수) ~ 9월 3일(금)';
+var SPEAKER_DEADLINE = '등록폼 수령 후 2주 이내';
 
 /* ───────────── 참석자 등록명단 ───────────── */
 
@@ -334,7 +334,7 @@ function inviteText_(r) {
   return r.name + '님, 안녕하세요.\n\n' + EVENT_TITLE + ' 연사로 함께해 주셔서 감사합니다.\n' +
     '아래 개인 링크에서 연사 안내를 확인하시고 기본정보와 발표정보를 등록해 주세요.\n\n' +
     r.link + '\n\n' +
-    '- 교육 일시: ' + EVENT_WHEN + '\n- 등록 마감: ' + SPEAKER_DEADLINE + '\n\n' +
+    '- 행사 일시: ' + EVENT_WHEN + '\n- 등록 마감: ' + SPEAKER_DEADLINE + '\n\n' +
     '기본정보와 발표정보는 나눠서 제출해도 되고, 같은 링크로 언제든 다시 들어와 확인·수정할 수 있어요.\n' +
     '이 링크는 ' + r.name + '님 전용이니 다른 분께 전달하지 말아 주세요.\n\n' + MAIL_FROM_NAME + ' 드림';
 }
@@ -350,7 +350,7 @@ function inviteHtml_(r) {
     '<p style="margin:0 0 20px">아래 버튼을 눌러 연사 안내를 확인하시고, 기본정보와 발표정보를 등록해 주세요.</p>' +
     '<p style="margin:0 0 24px;text-align:center"><a href="' + esc(r.link) + '" style="display:inline-block;background:#1d4e89;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px">연사 안내 · 정보 등록하기</a></p>' +
     '<table style="width:100%;font-size:14px;background:#f5f8fb;border-radius:8px" cellpadding="8">' +
-    '<tr><td style="color:#5f6b7a;width:90px">교육 일시</td><td>' + esc(EVENT_WHEN) + '</td></tr>' +
+    '<tr><td style="color:#5f6b7a;width:90px">행사 일시</td><td>' + esc(EVENT_WHEN) + '</td></tr>' +
     '<tr><td style="color:#5f6b7a">등록 마감</td><td><b>' + esc(SPEAKER_DEADLINE) + '</b></td></tr></table>' +
     '<p style="margin:20px 0 0;font-size:13px;color:#5f6b7a">기본정보와 발표정보는 나눠서 제출해도 되고, 같은 링크로 언제든 다시 들어와 확인·수정할 수 있어요.<br>이 링크는 ' + esc(r.name) + '님 전용이니 다른 분께 전달하지 말아 주세요.<br>버튼이 열리지 않으면: ' + esc(r.link) + '</p>' +
     '</div><div style="padding:14px 28px;border-top:1px solid #e3e8ef;font-size:12px;color:#9aa5b1">' + esc(MAIL_FROM_NAME) + '</div></div></div>';

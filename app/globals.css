@@ -359,3 +359,25 @@ input[readonly] { background: var(--soft); color: var(--muted); }
   .fi-hero, .fi-grid { grid-template-columns: 1fr; }
   .fi-head { flex-direction: column; }
 }
+
+/* 연사별 세션 정보 */
+.session-card { margin-top: 24px; border: 1px solid #cfdcec; border-radius: 14px; overflow: hidden; }
+.session-card-head { background: linear-gradient(135deg, #f3f7fc, #e9f1fb); padding: 16px 20px; border-bottom: 1px solid #d9e4f2; }
+.session-card-head h3 { margin: 0; font-size: 17px; color: var(--primary); }
+.session-card-head p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.session-dl { display: grid; grid-template-columns: 130px 1fr; gap: 12px 16px; margin: 0; padding: 18px 20px; font-size: 15px; }
+.session-dl dt { color: var(--muted); font-size: 14px; }
+.session-dl dd { margin: 0; min-width: 0; }
+.session-dl dd.agenda { font-weight: 700; color: #1d3f6b; }
+.session-include { margin: 0 20px 20px; padding: 14px 16px; background: #fffaf0; border: 1px solid #f5e3bd; border-radius: 10px; font-size: 14px; }
+.session-include p { margin: 0 0 6px; font-weight: 600; color: #8a4b00; }
+.session-include ul { margin: 0; padding-left: 18px; }
+.session-include li { margin: 4px 0; }
+.session-mini { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; background: var(--soft); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 14px; }
+.session-mini span { color: var(--muted); }
+.sp-intro { padding-top: 40px; }
+@media (max-width: 640px) {
+  .session-dl { grid-template-columns: 1fr; gap: 2px; }
+  .session-dl dd { margin-bottom: 10px; }
+  .session-mini { grid-template-columns: 1fr; }
+}
